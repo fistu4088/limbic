@@ -1,0 +1,18 @@
+[Unit]
+Description=limbic leisure runner (free time driven by feelings)
+After=limbic.service network-online.target
+Wants=limbic.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/limbic
+# LEISURE_* settings; LIMBIC_LLM_* is reused for the local model if LEISURE_LLM_* is unset
+EnvironmentFile=/etc/limbic/limbic.env
+EnvironmentFile=-/etc/limbic/leisure.env
+ExecStart=/usr/bin/python3 contrib/leisure/runner.py daemon --interval 60
+Restart=always
+RestartSec=30
+# kill switch: systemctl stop limbic-leisure (or leisure_enabled=false in the temperament)
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "limbic"
+version = "0.9.0"
+description = "A pluggable artificial emotion system for LLM agents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = []
+
+[project.scripts]
+limbic = "limbic.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["limbic*"]
+
+[tool.setuptools.package-data]
+limbic = ["dashboard/*.html"]

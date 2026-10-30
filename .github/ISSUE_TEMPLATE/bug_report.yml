@@ -1,0 +1,42 @@
+name: Bug report
+description: Something does not work, crashes, or behaves wrongly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing limbic! **Please do not paste tokens, API keys, passwords, or private chat
+        content** — replace them with `***`.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. ...\n2. ...\n3. ..."
+  - type: input
+    id: version
+    attributes:
+      label: limbic version / commit
+      description: Shown at the bottom of the dashboard sidebar, or `git log -1 --oneline`
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part?
+      options: [Installation / setup, limbic server, Dashboard, Hermes plugin, Images, Free time (leisure), Autonomy (writing first), Appraiser model / API, Other]
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, agent framework/integration (if any), appraiser model (e.g. "Ubuntu 24.04, Python 3.12, framework X v1.2, gpt-4o-mini")
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`journalctl -u limbic -n 50`, the error from `~/.hermes/logs/`, or the browser console. Remove secrets first."
+      render: text

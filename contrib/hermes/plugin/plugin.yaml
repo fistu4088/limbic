@@ -1,0 +1,100 @@
+name: limbic
+version: "0.9.0"
+manifest_version: 2
+description: "limbic emotion system — gives this profile feelings, needs and autonomy. Injects the inner state before each turn, appraises the exchange afterwards, and lets the agent message people on its own (Telegram, Discord, Desktop) when it wants to."
+author: limbic contributors
+license: MIT
+tags: [emotions, autonomy, companion]
+provides_hooks: [pre_llm_call, post_llm_call, transform_tool_result]
+config_schema:
+  url:
+    type: str
+    default: "http://127.0.0.1:8770"
+    label: "limbic server URL"
+  agent:
+    type: str
+    default: ""
+    label: "limbic agent id"
+    description: "Which limbic agent this profile is (e.g. aria). Empty = the profile name."
+  token_file:
+    type: str
+    default: "/etc/limbic/token"
+    label: "Token file"
+  lang:
+    type: str
+    default: "en"
+    choices: [hu, en]
+    label: "Language of the inner-state block"
+  feelings_enabled:
+    type: bool
+    default: true
+    label: "Feelings (inject inner state + appraise conversations)"
+  autonomy_enabled:
+    type: bool
+    default: false
+    label: "Autonomy: may write on its own"
+    description: "Telegram/Discord also need plugins.entries.limbic.allow_gateway_injection: true."
+  channel_strategy:
+    type: str
+    default: "last_active"
+    choices: [last_active, preference]
+    label: "Which channel to write on"
+    description: "last_active = where the person last talked; preference = first available in the list."
+  channel_preference:
+    type: list
+    default: [telegram, discord, desktop]
+    label: "Channel preference order"
+  fallback_after_min:
+    type: int
+    default: 5
+    label: "Fallback after (min)"
+    description: "If the chosen channel's host does not pick the intent up, another channel takes it."
+  poll_interval_s:
+    type: int
+    default: 60
+    label: "Autonomy poll interval (s)"
+  default_speaker:
+    type: str
+    default: "user"
+    label: "Name for unknown / local sender"
+  senders:
+    type: dict
+    default: {}
+    label: "Sender id -> person name"
+  routes:
+    type: dict
+    default: {}
+    label: "Person -> platform routes"
+    description: "{\"Ádám\": {\"telegram\": {\"chat_id\": \"1\", \"user_id\": \"1\", \"chat_type\": \"dm\"}}}"
+  private_platforms:
+    type: list
+    default: [telegram]
+    label: "Platforms counted as private 1:1"
+  skip_platforms:
+    type: list
+    default: [cron, kanban, subagent]
+    label: "Platforms ignored"
+  images_enabled:
+    type: bool
+    default: true
+    label: "Feel images the agent sees"
+    description: "Attached images described by auxiliary.vision, vision_analyze calls and image_commands become things she saw."
+  image_commands:
+    type: list
+    default: [image-analyze]
+    label: "Shell commands whose output is an image description"
+    description: "If the agent analyses images with its own script via the terminal tool, list the script name here."
+  image_lang:
+    type: str
+    default: ""
+    label: "Language of the 'what you see' block (empty = lang)"
+  image_memory:
+    type: str
+    default: ""
+    choices: ["", hindsight]
+    label: "Also store seen images as long-term memories"
+    description: "hindsight = write a first-person memory to the profile's Hindsight bank."
+  see_timeout_s:
+    type: int
+    default: 20
+    label: "Max seconds to appraise an image before answering"

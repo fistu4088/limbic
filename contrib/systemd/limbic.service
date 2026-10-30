@@ -1,0 +1,16 @@
+[Unit]
+Description=limbic emotion system (API + dashboard + autonomy scheduler)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/limbic
+# LIMBIC_TOKEN (required for writes), optional LIMBIC_LLM_URL / LIMBIC_LLM_MODEL / LIMBIC_LLM_KEY
+EnvironmentFile=/etc/limbic/limbic.env
+ExecStart=/usr/bin/python3 -m limbic serve --db /var/lib/limbic/limbic.db --host 127.0.0.1 --port 8770 --autonomy-interval 60
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

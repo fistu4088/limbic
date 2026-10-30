@@ -1,0 +1,1172 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LIMBIC // emotion monitor</title>
+<style>
+:root{
+  --bg:#07080c; --panel:rgba(255,255,255,.032); --panel2:rgba(255,255,255,.055); --line:rgba(255,255,255,.075); --line2:rgba(255,255,255,.14);
+  --text:#ecebf3; --mute:#878ba0; --dim:#5d6174;
+  --acc:#ff9f7a; --acc2:#ff6f9c; --iris:#9d8cff;
+  --good:#5fe3b0; --bad:#ff6b81; --blue:#6cb8ff; --vio:#a993ff; --yel:#ffd36b;
+  --mh:175; --ms:62%; --spd:9s;
+  --mood:hsl(var(--mh) var(--ms) 62%); --mood2:hsl(calc(var(--mh) + 38) var(--ms) 58%);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --sans:Inter,"Segoe UI",system-ui,-apple-system,sans-serif; --mono:ui-monospace,"JetBrains Mono",Consolas,monospace;
+  --r:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;overflow-x:hidden}
+::selection{background:hsl(var(--mh) 70% 50% / .35)}
+.aura{position:fixed;inset:-20vmax;z-index:0;pointer-events:none;filter:blur(70px) saturate(1.1);opacity:.55}
+.aura i{position:absolute;border-radius:50%;mix-blend-mode:screen;animation:drift var(--spd) ease-in-out infinite alternate;transition:background 2s}
+.aura i:nth-child(1){width:55vmax;height:55vmax;left:48%;top:-6%;background:radial-gradient(circle,hsl(var(--mh) var(--ms) 45% / .55),transparent 65%)}
+.aura i:nth-child(2){width:45vmax;height:45vmax;left:8%;top:50%;background:radial-gradient(circle,hsl(calc(var(--mh) + 40) var(--ms) 40% / .45),transparent 65%);animation-delay:-4s}
+.aura i:nth-child(3){width:35vmax;height:35vmax;left:70%;top:62%;background:radial-gradient(circle,hsl(calc(var(--mh) - 35) 60% 40% / .35),transparent 65%);animation-delay:-8s}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(-4vmax,3vmax) scale(1.12)}}
+.grain{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+@media (prefers-reduced-motion:reduce){.aura i,.orb span,.who .dot{animation:none!important}}
+.app{position:relative;z-index:1;display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+.side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:14px;padding:20px 14px 16px;border-right:1px solid var(--line);background:linear-gradient(180deg,rgba(10,11,16,.82),rgba(10,11,16,.62));backdrop-filter:blur(18px)}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px}
+.brand svg{width:30px;height:30px;flex:none;filter:drop-shadow(0 0 10px hsl(var(--mh) 80% 60% / .55))}
+.brand b{font:600 21px/1 var(--serif);letter-spacing:.02em}
+.brand small{display:block;color:var(--dim);font:500 10px/1.2 var(--sans);letter-spacing:.22em;text-transform:uppercase;margin-top:4px}
+.who{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.who .dot{width:34px;height:34px;border-radius:50%;flex:none;background:radial-gradient(circle at 35% 30%,#fff8,transparent 45%),radial-gradient(circle,var(--mood),var(--mood2));box-shadow:0 0 18px hsl(var(--mh) 80% 60% / .5);animation:breathe var(--spd) ease-in-out infinite}
+.who select{width:100%;border:0;background:transparent;font-weight:600;padding:2px 0;cursor:pointer;box-shadow:none}
+.who .sub{display:block;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tabs{display:flex;flex-direction:column;gap:2px;flex:1;overflow:auto;margin:0 -4px;padding:0 4px}
+#tabs a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:11px;color:var(--mute);text-decoration:none;font-weight:500;cursor:pointer;position:relative;transition:background .2s,color .2s}
+#tabs a svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#tabs a:hover{background:var(--panel2);color:var(--text)}
+#tabs a.on{color:var(--text);background:linear-gradient(90deg,hsl(var(--mh) 70% 55% / .18),transparent)}
+#tabs a.on:before{content:"";position:absolute;left:-4px;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--mood);box-shadow:0 0 10px var(--mood)}
+#tabs a kbd{margin-left:auto;font:10px var(--mono);color:var(--dim);opacity:0;transition:.2s}
+#tabs:hover a kbd{opacity:1}
+#tabs a .badge{margin-left:auto;min-width:18px;padding:0 6px;border-radius:9px;background:var(--panel2);font-size:10.5px;line-height:18px;text-align:center;color:var(--mute)}
+#tabs a .badge+kbd{margin-left:6px}
+#tabs a .badge.hot{background:var(--acc2);color:#fff;box-shadow:0 0 10px var(--acc2)}
+.upd{border:1px solid var(--line);border-radius:14px;padding:11px 12px;background:var(--panel);font-size:12px;transition:border-color .4s,box-shadow .4s}
+.upd .ver{display:flex;justify-content:space-between;color:var(--mute)}
+.upd .ver b{color:var(--text);font-weight:600}
+.upd .ver code{font:11px var(--mono);color:var(--dim)}
+.upd button{width:100%;margin-top:8px}
+.upd.has{border-color:hsl(var(--mh) 70% 60% / .55);box-shadow:0 0 0 1px hsl(var(--mh) 70% 60% / .15),0 8px 30px -10px hsl(var(--mh) 80% 55% / .6)}
+.sidefoot{display:flex;gap:6px;align-items:center}
+.sidefoot button{flex:1}
+.main{min-width:0;padding:0 28px 60px}
+.topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:20px 0 16px;margin-bottom:4px;background:linear-gradient(180deg,var(--bg) 60%,transparent)}
+.topbar h1{margin:0;font:500 30px/1.1 var(--serif);letter-spacing:-.01em}
+.topbar .lead{color:var(--mute);font-size:13px;max-width:620px;margin-top:3px}
+.seg{display:inline-flex;padding:3px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.seg button{border:0;background:transparent;padding:5px 10px;border-radius:9px;font-size:12px;color:var(--mute)}
+.seg button.on{background:var(--panel2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line2)}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 10px var(--good);animation:p 2s infinite}
+.pulse.off{background:#555;box-shadow:none;animation:none}
+@keyframes p{50%{opacity:.3}}
+@keyframes breathe{50%{transform:scale(1.06);filter:brightness(1.15)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+select,input,textarea,button{background:rgba(255,255,255,.045);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:7px 11px;font:inherit;outline:none;transition:border-color .15s,background .15s,box-shadow .15s}
+select option{background:#14161d}
+input:focus,select:focus,textarea:focus{border-color:hsl(var(--mh) 70% 62% / .7);box-shadow:0 0 0 3px hsl(var(--mh) 70% 62% / .15)}
+textarea{width:100%;font:12px/1.5 var(--mono)}
+button{cursor:pointer;font-weight:500}
+button:hover{background:rgba(255,255,255,.08);border-color:var(--line2)}
+button:active{transform:translateY(1px)}
+button.primary{background:linear-gradient(135deg,var(--acc),var(--acc2));border-color:transparent;color:#1a0d12;font-weight:650;box-shadow:0 6px 22px -8px var(--acc2)}
+button.primary:hover{filter:brightness(1.08)}
+button.ghost{background:transparent}
+button.on{border-color:hsl(var(--mh) 70% 62% / .6);color:var(--text)}
+button.small{padding:3px 9px;font-size:11.5px;border-radius:8px}
+button:disabled{opacity:.45;cursor:default;filter:none}
+.sp{flex:1}
+.page{display:none}
+.page.on{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;animation:rise .45s cubic-bezier(.2,.7,.2,1)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+.card{position:relative;min-width:0;padding:18px 20px;border-radius:var(--r);background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.018));border:1px solid var(--line);box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 20px 50px -30px rgba(0,0,0,.8);backdrop-filter:blur(10px)}
+.card h3{margin:0 0 14px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font:500 17px/1.25 var(--serif);color:var(--text);letter-spacing:.005em}
+.card h3 .hint{font:400 12px/1.4 var(--sans);color:var(--mute)}
+.card h3 button{align-self:center}
+.c3{grid-column:span 3}.c4{grid-column:span 4}.c5{grid-column:span 5}.c6{grid-column:span 6}.c7{grid-column:span 7}.c8{grid-column:span 8}.c9{grid-column:span 9}.c12{grid-column:span 12}
+@media(max-width:1250px){.c3,.c4,.c5{grid-column:span 6}.c6,.c7,.c8,.c9{grid-column:span 12}}
+@media(max-width:760px){.c3,.c4,.c5,.c6,.c7,.c8,.c9{grid-column:span 12}}
+.hero{grid-column:span 12;display:grid;grid-template-columns:auto 1fr;gap:38px;align-items:center;padding:28px 32px;overflow:hidden}
+.hero:after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(600px 260px at 0% 50%,hsl(var(--mh) 70% 55% / .16),transparent 70%)}
+.orb{position:relative;width:176px;height:176px;margin:8px}
+.orb span{position:absolute;inset:0;border-radius:50%}
+.orb .o1{background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.8),transparent 22%),radial-gradient(circle at 50% 55%,var(--mood),var(--mood2) 60%,hsl(calc(var(--mh) + 70) 60% 25%) 100%);box-shadow:0 0 60px hsl(var(--mh) 80% 55% / .55),inset -18px -24px 50px rgba(0,0,0,.45);animation:breathe var(--spd) ease-in-out infinite;transition:background 2s,box-shadow 2s}
+.orb .o2{inset:-14px;border:1px solid hsl(var(--mh) 80% 70% / .3);animation:ring var(--spd) ease-out infinite}
+.orb .o3{inset:-14px;border:1px solid hsl(var(--mh) 80% 70% / .2);animation:ring var(--spd) ease-out infinite;animation-delay:calc(var(--spd) / -2)}
+@keyframes ring{from{transform:scale(.95);opacity:.9}to{transform:scale(1.28);opacity:0}}
+.hero .k,.tiles .k{font:600 10.5px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--mute)}
+.hero .big{font:500 48px/1.05 var(--serif);margin:10px 0 6px;letter-spacing:-.015em}
+.hero .big::first-letter{text-transform:uppercase}
+.hero .s{color:var(--mute)}
+.hero .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:22px}
+.hero .tiles>div{padding:12px 14px;border-radius:12px;background:rgba(0,0,0,.22);border:1px solid var(--line)}
+.hero .tiles .v{display:block;font:500 19px/1.25 var(--serif);margin-top:8px}
+.hero .tiles .v::first-letter{text-transform:uppercase}
+.hero .tiles .s{display:block;font-size:12px;margin-top:3px}
+@media(max-width:900px){.hero{grid-template-columns:1fr;gap:20px;padding:22px}.hero>div:not(.orb){width:100%}.orb{width:110px;height:110px}.hero .big{font-size:34px}.hero .tiles{grid-template-columns:1fr}}
+.tile{display:flex;flex-direction:column;gap:2px}
+.tile .k{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.tile .v{font:500 22px/1.2 var(--serif)}
+.tile .v::first-letter{text-transform:uppercase}
+.tile .s{color:var(--mute);font-size:12px}
+.sub{color:var(--mute);font-size:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bar{height:7px;background:rgba(255,255,255,.06);border-radius:99px;position:relative;flex:1;min-width:60px}
+.bar>i{position:absolute;top:0;bottom:0;border-radius:99px;transition:width .6s cubic-bezier(.2,.7,.2,1),left .6s}
+.bar>u{position:absolute;top:-4px;bottom:-4px;width:2px;background:rgba(255,255,255,.55);border-radius:1px}
+.bar.center:after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,.22)}
+.kv{display:grid;grid-template-columns:132px 1fr 56px;gap:10px;align-items:center;margin:8px 0;font-size:13px}
+.kv b{font-weight:550}
+.kv .ex{grid-column:1/-1;margin-top:-4px;color:var(--mute);font-size:11.5px}
+.num{font-variant-numeric:tabular-nums;color:var(--mute);text-align:right;font-size:12px}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+.tag.alert{border-color:color-mix(in srgb,var(--bad) 55%,transparent);color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.tag.good{border-color:color-mix(in srgb,var(--good) 50%,transparent);color:var(--good);background:color-mix(in srgb,var(--good) 8%,transparent)}
+.tag.warn{border-color:color-mix(in srgb,var(--yel) 50%,transparent);color:var(--yel);background:color-mix(in srgb,var(--yel) 8%,transparent)}
+.tag.info{border-color:color-mix(in srgb,var(--blue) 50%,transparent);color:var(--blue);background:color-mix(in srgb,var(--blue) 8%,transparent)}
+canvas{width:100%;display:block}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--mute);margin-top:8px;flex-wrap:wrap}
+.legend span:before{content:"";display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:7px;vertical-align:middle;background:var(--c)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+td,th{padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--mute);font-weight:600;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;position:sticky;top:0;background:#0f1117;z-index:1}
+tr:hover td{background:rgba(255,255,255,.025)}
+.scroll{max-height:600px;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+pre{white-space:pre-wrap;background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:12px;padding:14px;font:12px/1.55 var(--mono);margin:0;max-height:520px;overflow:auto}
+.emo{margin:8px 0;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.18)}
+.emo .top{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:6px}
+.emo .cause{color:var(--mute);font-size:11.5px;margin-top:5px}
+.rel{border:1px solid var(--line);border-radius:14px;padding:14px;background:rgba(0,0,0,.18);transition:border-color .2s}
+.rel:hover{border-color:var(--line2)}
+.rel .name{font:500 18px/1.2 var(--serif);margin-bottom:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+label.s{display:grid;grid-template-columns:96px 1fr 40px;gap:8px;align-items:center;font-size:12px;margin:4px 0}
+input[type=range]{-webkit-appearance:none;appearance:none;height:5px;padding:0;border:0;border-radius:99px;background:rgba(255,255,255,.1);box-shadow:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--text);box-shadow:0 0 0 3px hsl(var(--mh) 70% 55% / .45);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border:0;border-radius:50%;background:var(--text);box-shadow:0 0 0 3px hsl(var(--mh) 70% 55% / .45);cursor:pointer}
+input[type=checkbox]{accent-color:var(--acc);width:15px;height:15px;padding:0}
+.tip{position:fixed;pointer-events:none;background:rgba(12,13,18,.94);border:1px solid var(--line2);padding:8px 11px;border-radius:10px;font-size:12px;display:none;z-index:30;max-width:340px;backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.toast{position:fixed;right:24px;bottom:24px;background:rgba(18,19,26,.96);border:1px solid var(--line2);border-left:3px solid var(--mood);padding:12px 16px;border-radius:12px;display:none;z-index:50;max-width:520px;box-shadow:0 18px 40px rgba(0,0,0,.55);animation:rise .3s}
+.empty{color:var(--mute);font-style:italic}
+.tog{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mute);margin-right:12px;cursor:pointer}
+.intent{border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:10px;padding:9px 12px;margin-bottom:8px;background:rgba(0,0,0,.18);font-size:12.5px}
+.intent.delivered{border-left-color:var(--blue)}.intent.answered{border-left-color:var(--good)}.intent.ignored,.intent.expired,.intent.dismissed,.intent.obsolete{border-left-color:#444;opacity:.6}
+.steer{display:inline-block;margin:3px 6px 0 0;padding:2px 9px;border-radius:99px;border:1px solid color-mix(in srgb,var(--acc) 55%,transparent);color:var(--acc);font-size:11.5px}
+.summary{font:400 17px/1.7 var(--serif);color:#d9d8e2}
+.summary b{color:#fff;font-weight:600}
+.why{border-left:3px solid var(--yel);padding:10px 14px;background:color-mix(in srgb,var(--yel) 6%,transparent);border-radius:0 12px 12px 0;margin-top:12px}
+.why.go{border-left-color:var(--good);background:color-mix(in srgb,var(--good) 6%,transparent)}
+.why.rest{border-left-color:var(--blue);background:color-mix(in srgb,var(--blue) 6%,transparent)}
+.warnbox{border:1px solid color-mix(in srgb,var(--yel) 40%,transparent);background:color-mix(in srgb,var(--yel) 7%,transparent);color:#f3dc9a;border-radius:12px;padding:12px 14px;font-size:12.5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:3px 11px;border-radius:99px;border:1px solid var(--line);font-size:11.5px;color:var(--mute);cursor:pointer;user-select:none;transition:.15s}
+.chip:hover{border-color:var(--line2);color:var(--text)}
+.chip.on{border-color:hsl(var(--mh) 70% 62% / .6);color:#fff;background:hsl(var(--mh) 70% 55% / .16)}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:4px 24px}
+.form label{display:grid;grid-template-columns:1fr 120px;gap:10px;align-items:center;font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line)}
+.form label.wide{grid-column:1/-1;grid-template-columns:200px 1fr}
+.form label span small{display:block;color:var(--mute);font-size:11px}
+.form input{padding:5px 8px;font-size:12px;width:100%}
+.form input[type=checkbox]{width:15px;justify-self:end}
+details summary{cursor:pointer;color:var(--mute);font-size:12.5px}
+.stat{display:flex;flex-direction:column;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.18);min-width:112px}
+.stat b{font:500 22px/1.2 var(--serif)}
+.stat span{font-size:11px;color:var(--mute)}
+.modal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:rgba(3,4,7,.62);backdrop-filter:blur(6px);padding:20px}
+.modal.on{display:flex;animation:rise .25s}
+.modal .box{width:min(640px,100%);max-height:86vh;overflow:auto;padding:26px 28px;border-radius:20px;background:#101219;border:1px solid var(--line2);box-shadow:0 30px 80px rgba(0,0,0,.7)}
+.modal h2{margin:0 0 6px;font:500 27px/1.2 var(--serif)}
+.commit{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+.commit code{font:11.5px var(--mono);color:var(--acc);flex:none;padding-top:2px}
+.commit .sub{flex:none;margin-left:auto;padding-left:8px}
+.steps{display:flex;gap:8px;margin:18px 0 4px}
+.steps div{flex:1;height:4px;border-radius:4px;background:rgba(255,255,255,.08)}
+.steps div.on{background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.steps div.run{background:linear-gradient(90deg,var(--acc),var(--acc2),var(--acc));background-size:200% 100%;animation:flow 1.2s linear infinite}
+@keyframes flow{to{background-position:-200% 0}}
+@media(max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{backdrop-filter:none;background:rgba(10,11,16,.97);position:sticky;height:auto;z-index:8;flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 14px;border-right:0;border-bottom:1px solid var(--line)}
+  .brand small,.upd .ver,.upd .sub,.sidefoot{display:none}
+  .who{flex:1;padding:6px 10px;min-width:0}.who .dot{width:24px;height:24px}
+  .upd{padding:0;border:0;background:none;box-shadow:none!important}.upd button{margin:0;width:auto}.upd .lbl{display:none}
+  #tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;flex-direction:row;overflow-x:auto;margin:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:rgba(10,11,16,.94);backdrop-filter:blur(16px);border-top:1px solid var(--line)}
+  #tabs a{flex-direction:column;gap:3px;padding:6px 10px;font-size:10.5px;flex:none}
+  #tabs a.on:before{left:30%;right:30%;top:-6px;bottom:auto;width:auto;height:3px}
+  #tabs a kbd{display:none}#tabs a .badge{position:absolute;top:2px;right:4px;margin:0}
+  .main{padding:0 14px 90px}.topbar{padding-top:14px}.topbar h1{font-size:24px}
+}
+</style>
+
+</head>
+<body>
+<div class="aura"><i></i><i></i><i></i></div><div class="grain"></div>
+<div class="app">
+<aside class="side">
+  <div class="brand">
+    <svg viewBox="0 0 32 32"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb08a"/><stop offset="1" stop-color="#9d8cff"/></linearGradient></defs>
+      <path d="M16 3c6 0 11 4.6 11 11.2 0 7.6-6.6 12.4-11 14.8C11.6 26.6 5 21.8 5 14.2 5 7.6 10 3 16 3z" fill="none" stroke="url(#lg)" stroke-width="2"/>
+      <path d="M10 15c2.2-3 4-3 6 0s3.8 3 6 0" fill="none" stroke="url(#lg)" stroke-width="2" stroke-linecap="round"/></svg>
+    <div><b>limbic</b><small>inner life monitor</small></div>
+  </div>
+  <div class="who"><div class="dot" id="whoDot"></div><div style="min-width:0;flex:1"><select id="agent" title="agent"></select><span class="sub" id="whoSub"></span></div></div>
+  <nav id="tabs"></nav>
+  <div class="upd" id="upd">
+    <div class="ver"><span>limbic <b id="updVer">–</b></span><span id="updHead"></span></div>
+    <div class="sub" id="updMsg" style="margin-top:4px"></div>
+    <button class="small" id="updBtn">⟳</button>
+  </div>
+  <div class="sidefoot">
+    <button class="ghost small" id="autoBtn"></button>
+    <button class="ghost small" id="langBtn">EN</button>
+    <div class="pulse" id="pulse"></div>
+  </div>
+</aside>
+<main class="main">
+<div class="topbar">
+  <div><h1 id="pageTitle"></h1><div class="lead" id="pageLead"></div></div>
+  <div class="sp"></div>
+  <div class="seg" id="ranges"></div>
+  <button class="ghost small" id="nowBtn" title="R">↻</button>
+  <span class="sub" id="updated"></span>
+</div>
+
+<!-- ============ OVERVIEW ============ -->
+<section class="page" id="p-overview">
+  <div class="card hero">
+    <div class="orb"><span class="o3"></span><span class="o2"></span><span class="o1"></span></div>
+    <div style="min-width:0;position:relative;z-index:1">
+      <span class="k" data-t="mood_now"></span>
+      <div class="big" id="ovMood">–</div>
+      <div class="s" id="ovMoodSub"></div>
+      <div class="tiles">
+        <div><span class="k" data-t="background"></span><span class="v" id="ovBase">–</span><span class="s" data-t="base_short"></span></div>
+        <div><span class="k" data-t="doing_now"></span><span class="v" id="ovNow">–</span><span class="s" id="ovNowSub"></span></div>
+        <div><span class="k" data-t="status"></span><span class="v" id="ovAlert">–</span><span class="s" id="ovAlertSub"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card c7"><h3 data-t="summary_h"></h3><div class="summary" id="ovSummary"></div></div>
+  <div class="card c5"><h3><span data-t="pull_h"></span><span class="hint sub" data-t="pull_hint"></span></h3><div id="ovPull"></div></div>
+
+  <div class="card c12">
+    <h3><span data-t="timeline"></span><span class="hint sub" data-t="timeline_hint"></span></h3>
+    <canvas id="chart" height="280"></canvas>
+    <div class="legend">
+      <span style="--c:#ff8f8f" data-t="l_p"></span><span style="--c:var(--blue)" data-t="l_a"></span>
+      <span style="--c:var(--vio)" data-t="l_d"></span><span style="--c:var(--yel)" data-t="l_b"></span>
+      <span style="--c:#ffffff55" data-t="l_e"></span>
+    </div>
+    <canvas id="drivesChart" height="110" style="margin-top:12px"></canvas>
+    <div class="legend">
+      <span style="--c:#3ddc97" data-t="social"></span><span style="--c:#4cc3ff" data-t="novelty"></span>
+      <span style="--c:#ffd23f" data-t="competence"></span><span style="--c:#ff4d6d" data-t="fatigue"></span><span style="--c:#9a7bff" data-t="sleepiness"></span>
+      <span style="--c:#ffffff33" data-t="l_thr"></span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEELINGS ============ -->
+<section class="page" id="p-feelings">
+  <div class="card c5"><h3><span data-t="feelings"></span><span class="hint sub" data-t="feelings_hint"></span><span class="sp"></span><button class="ghost small" id="feelEdBtn" onclick="feelEdit()">✎</button></h3><div id="feelEd"></div><div id="emotions"></div></div>
+  <div class="card c4"><h3><span data-t="drives"></span><span class="hint sub" data-t="drives_hint"></span><span class="sp"></span><button class="ghost small" onclick="needsEdit()">✎</button></h3><div id="drives"></div></div>
+  <div class="card c3"><h3 data-t="pad_h"></h3>
+    <div class="sub" data-t="mood_now"></div><div id="pad"></div>
+    <div class="sub" style="margin-top:12px" data-t="background"></div><div id="basePad"></div>
+    <div class="sub" style="margin-top:10px" data-t="pad_ex"></div>
+  </div>
+  <div class="card c6"><h3><span data-t="behaviour"></span><span class="hint sub" data-t="behaviour_hint"></span></h3><div id="mods"></div></div>
+  <div class="card c6"><h3 data-t="prompt"></h3>
+    <div class="row" style="margin-bottom:8px">
+      <select id="pLang"><option value="hu">hu</option><option value="en">en</option></select>
+      <select id="pWho"><option value="">—</option></select>
+      <span class="sub" data-t="prompt_hint"></span>
+    </div>
+    <pre id="prompt"></pre>
+  </div>
+</section>
+
+<!-- ============ RELATIONSHIPS ============ -->
+<section class="page" id="p-rels">
+  <div class="card c8"><h3><span data-t="people"></span><span class="hint sub" data-t="people_hint"></span></h3><div class="grid" id="people"></div></div>
+  <div class="card c4"><h3 data-t="thread"></h3><div id="thread"></div><div id="steering" style="margin-top:8px"></div></div>
+  <div class="card c12" id="sexCard" style="display:none"><h3><span>Intimitás — tanult nyitottság / learned openness</span></h3><div id="sexuality"></div></div>
+  <div class="card c6"><h3><span data-t="characters"></span><span class="hint sub" data-t="characters_hint"></span></h3><div id="chars"></div></div>
+  <div class="card c6"><h3><span data-t="others"></span><span class="hint sub" data-t="others_hint"></span></h3><div id="others"></div></div>
+</section>
+
+<!-- ============ LEISURE ============ -->
+<section class="page" id="p-leisure">
+  <div class="card c5"><h3 data-t="ls_now"></h3><div id="lsNow"></div></div>
+  <div class="card c7"><h3><span data-t="ls_signals"></span><span class="hint sub" data-t="ls_signals_hint"></span></h3><div id="lsSignals"></div></div>
+  <div class="card c4"><h3><span data-t="ls_taste"></span><span class="hint sub" data-t="ls_taste_hint"></span></h3><div id="lsTaste"></div></div>
+  <div class="card c8"><h3 data-t="ls_log"></h3><div class="scroll" id="lsLog"></div></div>
+</section>
+
+<!-- ============ AUTONOMY ============ -->
+<section class="page" id="p-autonomy">
+  <div class="card c4"><h3 data-t="aut_rules"></h3><div id="autRules"></div></div>
+  <div class="card c8"><h3><span data-t="aut_people"></span><span class="hint sub" data-t="aut_people_hint"></span></h3><div id="autPeople"></div></div>
+  <div class="card c12"><h3><span data-t="autonomy"></span><span class="hint sub" data-t="aut_sub"></span></h3>
+    <div class="row" style="margin-bottom:8px"><button id="evalBtn" data-t="evaluate"></button></div>
+    <div id="intents" class="scroll" style="max-height:420px"></div>
+    <pre id="instr" style="display:none;margin-top:8px"></pre>
+  </div>
+</section>
+
+<!-- ============ MEMORY ============ -->
+<section class="page" id="p-memory">
+  <div class="card c12">
+    <h3><span data-t="memory"></span><span class="hint sub" data-t="memory_hint"></span></h3>
+    <div class="row" id="evStats" style="margin-bottom:10px"></div>
+    <div class="row" style="margin-bottom:10px">
+      <input id="evSearch" style="flex:1;min-width:200px">
+      <select id="evVal"><option value="all"></option><option value="pos"></option><option value="neg"></option></select>
+      <label class="tog"><input type="checkbox" id="evMundane"> <span data-t="hide_mundane"></span></label>
+    </div>
+    <div class="chips" id="evSources" style="margin-bottom:10px"></div>
+    <div class="scroll"><table id="events"></table></div>
+  </div>
+</section>
+
+<!-- ============ LAB ============ -->
+<section class="page" id="p-lab">
+  <div class="card c12"><div class="warnbox" data-t="lab_warn"></div></div>
+  <div class="card c6"><h3 data-t="stimulus"></h3>
+    <div class="row" style="margin-bottom:8px">
+      <input id="speaker" style="width:120px">
+      <input id="text" style="flex:1">
+      <button class="primary" id="observeBtn" data-t="observe"></button>
+    </div>
+    <label class="tog"><input type="checkbox" id="o_private"> <span data-t="private"></span></label>
+    <div class="sub" style="margin-top:6px" data-t="observe_ex"></div>
+  </div>
+  <div class="card c6"><h3 data-t="time_h"></h3>
+    <div class="row">
+      <button id="tickBtn" data-t="tick"></button>
+      <button id="consBtn" data-t="consolidate"></button>
+      <button id="resetBtn" data-t="reset"></button>
+    </div>
+    <div class="sub" style="margin-top:8px" data-t="time_ex"></div>
+  </div>
+  <div class="card c12"><h3 data-t="manual"></h3>
+    <div class="row" style="margin:0 0 8px">
+      <input id="m_event" value="praise" style="width:120px" placeholder="event">
+      <input id="m_target" style="width:120px" placeholder="target">
+      <select id="m_agency"><option>other</option><option>self</option><option>circumstance</option></select>
+      <input id="m_summary" placeholder="summary" style="flex:1;min-width:200px">
+      <input id="m_topic" placeholder="topic" style="width:140px">
+    </div>
+    <div class="grid" id="sliders"></div>
+    <div class="row" style="margin-top:8px">
+      <label class="sub"><input type="checkbox" id="m_prospective"> prospective</label>
+      <label class="sub"><input type="checkbox" id="m_loss"> loss</label>
+      <label class="sub"><input type="checkbox" id="m_blocked"> blocked</label>
+      <label class="sub"><input type="checkbox" id="m_rebuff"> rebuff</label>
+      <label class="sub"><input type="checkbox" id="m_private"> private</label>
+      <div class="sp"></div>
+      <button class="primary" id="feelBtn" data-t="feel"></button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SETTINGS ============ -->
+<section class="page" id="p-settings">
+  <div class="card c12">
+    <h3><span data-t="temperament"></span><span class="hint sub" data-t="temp_hint"></span></h3>
+    <div id="tempForm"></div>
+    <div class="row" style="margin-top:12px"><button class="primary" id="tempBtn" data-t="save"></button><span class="sub" id="tempDirty"></span></div>
+    <details style="margin-top:14px"><summary data-t="raw_json"></summary>
+      <textarea id="temp" rows="14" style="margin-top:8px"></textarea>
+      <div class="row" style="margin-top:8px"><button id="tempRawBtn" data-t="save_raw"></button></div>
+    </details>
+  </div>
+</section>
+
+</main>
+</div>
+
+<div class="modal" id="updModal"><div class="box">
+  <h2 id="umTitle"></h2><div class="sub" id="umSub"></div>
+  <div class="steps" id="umSteps" style="display:none"><div></div><div></div><div></div></div>
+  <div id="umBody" style="margin-top:14px"></div>
+  <div class="row" style="margin-top:18px"><div class="sp"></div><button class="ghost" id="umClose"></button><button class="primary" id="umGo"></button></div>
+</div></div>
+<div class="tip" id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+// ---------------------------------------------------------------- i18n
+const I18N = {
+ hu: {
+  tab_overview:"Áttekintés",tab_feelings:"Érzések",tab_rels:"Kapcsolatok",tab_leisure:"Szabadidő",tab_autonomy:"Önállóság",tab_memory:"Emlékek",tab_lab:"Labor",tab_settings:"Beállítások",
+  mood_now:"Hangulat most",background:"Háttérhangulat",base_short:"hetes léptékű alapállapot",doing_now:"Mit csinál",status:"Állapot",
+  summary_h:"Összegzés",pull_h:"Mi húzza a hangulatot",pull_hint:"az aktív érzések hatása a kedvre",
+  timeline:"Idővonal",timeline_hint:"vigyél rá az egeret a részletekért",l_p:"kedv (hangulat)",l_a:"aktiváltság",l_d:"kontroll",l_b:"háttérhangulat",l_e:"események",l_thr:"60% küszöb",
+  social:"társaság",novelty:"újdonság",competence:"hasznosság",fatigue:"kimerültség",sleepiness:"álmosság",recognition:"elismerés",intimacy:"intimitás",libido:"vágy (libidó)",
+  feelings:"Aktív érzések",feelings_hint:"mi váltotta ki, milyen erős, mikor csillapodik",drives:"Szükségletek",drives_hint:"maguktól nőnek; a küszöb felett érzéssé válnak",
+  pad_h:"Hangulat-tengelyek",pad_ex:"Kedv: jó–rossz. Aktiváltság: pörgős–tompa. Kontroll: magabiztos–kiszolgáltatott.",
+  pleasure:"kedv",arousal:"aktiváltság",dominance:"kontroll",
+  behaviour:"Viselkedés-módosítók",behaviour_hint:"ezek alakítják, hogyan beszél; a jelölt küszöböknél kerül utasítás a promptba",
+  prompt:"A modell promptjába kerülő blokk",prompt_hint:"nyelv · kivel beszél",
+  people:"Emberek",people_hint:"akikkel beszél; a pipák operátori beállítások",characters:"Történetek szereplői",characters_hint:"olvasmányokból; soha nem valódi kapcsolat",
+  others:"Egyéb célpontok",others_hint:"dolgok, témák, nevek, akik nem beszéltek vele",thread:"Beszélgetés és izgalom",
+  affection:"kötődés",trust:"bizalom",resentment:"neheztelés",fear:"félelem",longing:"hiányérzet",attraction:"vonzalom",
+  interactions:"interakció",unanswered:"válasz nélkül",last_seen:"utoljára",reachable:"írhat neki magától",c_romance:"romantika OK",c_adult:"felnőtt téma OK",
+  contact:"elérhetőség (pl. telegram:123)",last_channel:"utolsó csatorna",
+  private:"privát beszélgetés",nothread:"Nincs aktív beszélgetés.",partner:"partner",topic:"téma",engagement:"bevonódás",peak:"csúcs",messages:"üzenet",idle:"csend",steer:"Merre terelné:",
+  ls_now:"Most",ls_signals:"Mi dönt",ls_signals_hint:"unalom = motiváció, hangulat = kapu, fáradtság = fék",ls_taste:"Ízlés",ls_taste_hint:"mennyire élvezi az egyes tevékenységeket",ls_log:"Szabadidős alkalmak",
+  aut_rules:"Szabályok",aut_people:"Kinek írna",aut_people_hint:"hiányérzet a megkeresési küszöbhöz képest",autonomy:"Szándékok",aut_sub:"a limbic csak dönt; a host veszi át és küldi el",evaluate:"Kiértékelés most",
+  nointent:"Még nem akart magától semmit.",why_miss:"hiányzik neki",why_check:"abbamaradt beszélgetés",claim:"átvesz",dismiss:"elvet",
+  memory:"Érzelmi emlékek",memory_hint:"minden esemény és amit kiváltott",search:"keresés a leírásban, személyben…",v_all:"minden",v_pos:"csak pozitív",v_neg:"csak negatív",hide_mundane:"hétköznapiak elrejtése",
+  time:"Idő",event:"Esemény",what:"Mi történt",eff:"Erő",felt:"Kiváltott",recall:"felidéz",mundane:"hétköznapi",noev:"Nincs esemény ebben az időszakban.",
+  lab_warn:"⚠ Labor: amit itt csinálsz, az valódi esemény a kiválasztott agentnél, és hat az érzéseire. Élő agenten csak tudatosan használd.",
+  stimulus:"Üzenet értékeltetése",observe:"Értékel",observe_ex:"A szöveget az értékelő modell elemzi, mintha a megadott személy írta volna.",
+  time_h:"Idő és alvás",tick:"Idő léptetése",consolidate:"Konszolidáció (alvás)",reset:"Reset",time_ex:"A konszolidáció újraéli a nap erős pillanatait és lassan mozgatja a háttérhangulatot. A reset az érzelmi állapotot nullázza, az emlékek maradnak.",
+  manual:"Kézi esemény",feel:"Mehet",confirm_reset:"Biztosan alaphelyzetbe állítod az érzelmi állapotot? Az emlékek megmaradnak.",
+  temperament:"Temperamentum",temp_hint:"a személyiség „biológiája” — mentés után azonnal érvényes",save:"Mentés",raw_json:"Nyers JSON",save_raw:"Nyers JSON mentése",unsaved:"nem mentett változás",
+  toward:"felé",auto_on:"⟳ auto",auto_off:"⏸ kézi",updated:"frissítve",
+ },
+ en: {
+  tab_overview:"Overview",tab_feelings:"Feelings",tab_rels:"Relationships",tab_leisure:"Free time",tab_autonomy:"Autonomy",tab_memory:"Memory",tab_lab:"Lab",tab_settings:"Settings",
+  mood_now:"Mood now",background:"Background mood",base_short:"weeks-scale disposition",doing_now:"Doing now",status:"Status",
+  summary_h:"Summary",pull_h:"What pulls the mood",pull_hint:"effect of active feelings on pleasure",
+  timeline:"Timeline",timeline_hint:"hover for details",l_p:"pleasure (mood)",l_a:"arousal",l_d:"dominance",l_b:"background",l_e:"events",l_thr:"60% threshold",
+  social:"social",novelty:"novelty",competence:"competence",fatigue:"exhaustion",sleepiness:"sleepiness",recognition:"recognition",intimacy:"intimacy",libido:"desire (libido)",
+  feelings:"Active feelings",feelings_hint:"cause, strength, when it fades",drives:"Needs",drives_hint:"grow by themselves; above the mark they become feelings",
+  pad_h:"Mood axes",pad_ex:"Pleasure: good–bad. Arousal: energetic–dull. Dominance: in control–helpless.",
+  pleasure:"pleasure",arousal:"arousal",dominance:"dominance",
+  behaviour:"Behaviour modulators",behaviour_hint:"shape how it talks; at the marks an instruction enters the prompt",
+  prompt:"Prompt block injected into the LLM",prompt_hint:"language · interlocutor",
+  people:"People",people_hint:"who talk to it; toggles are operator settings",characters:"Story characters",characters_hint:"from reading; never real relationships",
+  others:"Other targets",others_hint:"things, topics, names that never talked to it",thread:"Conversation & excitement",
+  affection:"affection",trust:"trust",resentment:"resentment",fear:"fear",longing:"longing",attraction:"attraction",
+  interactions:"interactions",unanswered:"unanswered",last_seen:"last seen",reachable:"may message on its own",c_romance:"romance OK",c_adult:"adult OK",
+  contact:"contact (e.g. telegram:123)",last_channel:"last channel",
+  private:"private conversation",nothread:"No active conversation.",partner:"partner",topic:"topic",engagement:"engagement",peak:"peak",messages:"messages",idle:"idle",steer:"Would steer towards:",
+  ls_now:"Now",ls_signals:"What decides",ls_signals_hint:"boredom = motive, mood = gate, fatigue = brake",ls_taste:"Taste",ls_taste_hint:"how much it enjoys each activity",ls_log:"Free-time sessions",
+  aut_rules:"Rules",aut_people:"Who it would message",aut_people_hint:"longing vs. outreach threshold",autonomy:"Intents",aut_sub:"limbic only decides; the host claims and sends",evaluate:"Evaluate now",
+  nointent:"Hasn't wanted anything on its own yet.",why_miss:"misses them",why_check:"conversation stopped",claim:"claim",dismiss:"dismiss",
+  memory:"Emotional memory",memory_hint:"every event and what it caused",search:"search summary, person…",v_all:"all",v_pos:"positive only",v_neg:"negative only",hide_mundane:"hide mundane",
+  time:"Time",event:"Event",what:"What happened",eff:"Strength",felt:"Felt",recall:"recall",mundane:"mundane",noev:"No events in this range.",
+  lab_warn:"⚠ Lab: everything here is a real event for the selected agent and moves its feelings. Use it deliberately on a live agent.",
+  stimulus:"Appraise a message",observe:"Observe",observe_ex:"The appraiser analyses the text as if the given person wrote it.",
+  time_h:"Time & sleep",tick:"Tick",consolidate:"Consolidate (sleep)",reset:"Reset",time_ex:"Consolidation re-lives the day's strong moments and slowly moves the background. Reset zeroes the emotional state; memories stay.",
+  manual:"Manual event",feel:"Feel it",confirm_reset:"Reset the emotional state? Memories are kept.",
+  temperament:"Temperament",temp_hint:"the personality's 'biology' — applies immediately",save:"Save",raw_json:"Raw JSON",save_raw:"Save raw JSON",unsaved:"unsaved changes",
+  toward:"towards",auto_on:"⟳ auto",auto_off:"⏸ manual",updated:"updated",
+ }
+};
+let lang = localStorage.getItem("limbic.lang") || "hu";
+const t = k => (I18N[lang]||I18N.en)[k] ?? k;
+const HU = () => lang==="hu";
+
+// emotion catalogue (mirrors limbic/emotions.py)
+const EMO = {joy:[.4,.2,.1,45,"öröm","#3ddc97"],amusement:[.45,.35,.15,20,"derültség","#ffd23f"],pride:[.4,.3,.3,90,"büszkeség","#ff7a1a"],
+ gratitude:[.4,.2,-.3,120,"hála","#4cc3ff"],hope:[.2,.2,-.1,180,"remény","#8ef0c4"],sadness:[-.4,-.2,-.5,240,"szomorúság","#5b7cff"],
+ anger:[-.51,.59,.25,60,"harag","#ff2e5b"],frustration:[-.4,.4,-.2,45,"frusztráció","#ff6b3d"],fear:[-.64,.6,-.43,40,"félelem","#b57bff"],
+ shame:[-.3,.1,-.6,120,"szégyen","#d16ba5"],boredom:[-.2,-.5,-.1,30,"unalom","#8d879b"],loneliness:[-.4,-.3,-.4,60,"magány","#6c8cae"],
+ excitement:[.3,.65,.25,25,"lelkesedés","#ff9d00"],longing:[-.25,-.1,-.35,120,"hiányérzet","#7f9cf5"],tenderness:[.5,0,.1,90,"gyengédség","#ff8fc7"],
+ desire:[.35,.7,.2,30,"vágy","#ff3fa4"],temptation:[.05,.6,-.25,30,"kísértés","#e08aff"]};
+const emoName = k => HU() ? ((EMO[k]||[])[4]||k) : k;
+const emoCol = k => (EMO[k]||[])[5]||"#aaa";
+
+const RANGES = [["24h",24],["7d",168],["30d",720],["120d",2880],["1y",8760]];
+const TABS = ["overview","feelings","rels","leisure","autonomy","memory","lab","settings"];
+let agent=null, hours=+(localStorage.getItem("limbic.hours")||168), state=null, hist=[], evs=[], temp=null;
+let tab = (location.hash||"").slice(1) || localStorage.getItem("limbic.tab") || "overview";
+let auto = localStorage.getItem("limbic.auto")!=="0";
+let evFilter = {q:"", val:"all", hideMundane:false, sources:new Set()};
+
+// ---------------------------------------------------------------- helpers
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function toast(msg){ const e=$("#toast"); e.textContent=msg; e.style.display="block"; clearTimeout(e._t); e._t=setTimeout(()=>e.style.display="none",3500); }
+async function api(path, opt={}){
+  const tok=localStorage.getItem("limbic.token");
+  const r = await fetch(path,{headers:{"Content-Type":"application/json",...(tok?{Authorization:"Bearer "+tok}:{})},...opt});
+  if(r.status===401){ const nt=prompt("API token"); if(nt){localStorage.setItem("limbic.token",nt); return api(path,opt);} }
+  if(!r.ok) throw new Error((await r.json().catch(()=>({error:r.status}))).error);
+  const ct=r.headers.get("content-type")||""; return ct.includes("json")? r.json(): r.text();
+}
+const fmtT = ts => new Date(ts*1000).toLocaleString(HU()?"hu-HU":"en-GB",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+const pct = v => Math.round((v||0)*100);
+function ago(sec){ sec=Math.max(0,sec); const m=Math.round(sec/60);
+  if(m<1) return HU()?"most":"just now"; if(m<60) return HU()?`${m} perce`:`${m} min ago`;
+  const h=Math.round(m/60); if(h<48) return HU()?`${h} órája`:`${h} h ago`; const d=Math.round(h/24); return HU()?`${d} napja`:`${d} d ago`; }
+function dur(min){ if(min<1) return HU()?"<1 perc":"<1 min"; if(min<90) return `${Math.round(min)} ${HU()?"perc":"min"}`; return `${(min/60).toFixed(1)} ${HU()?"óra":"h"}`; }
+function cbar(v,color){ const w=Math.min(1,Math.abs(v))*50, l= v>=0?50:50-w; return `<div class="bar center"><i style="left:${l}%;width:${w}%;background:${color};box-shadow:0 0 8px ${color}"></i></div>`; }
+function bar(v,color,marks=[]){ return `<div class="bar"><i style="left:0;width:${Math.max(0,Math.min(1,v))*100}%;background:${color};box-shadow:0 0 8px ${color}"></i>${marks.map(m=>`<u style="left:calc(${Math.max(0,Math.min(1,m))*100}% - 1px)" title="${pct(m)}%"></u>`).join("")}</div>`; }
+function padRows(m){ return [["pleasure","p","#ff8f8f"],["arousal","a","var(--blue)"],["dominance","d","var(--vio)"]]
+  .map(([k,ax,c])=>`<div class="kv"><b>${t(k)}</b>${cbar(m[ax],c)}<span class="num">${m[ax]>=0?"+":""}${m[ax].toFixed(2)}</span></div>`).join(""); }
+const T = k => (temp||{})[k];
+
+// ---------------------------------------------------------------- tabs
+const ICON={
+ overview:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.2"/></svg>',
+ feelings:'<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
+ rels:'<svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.2"/><circle cx="16.5" cy="10.5" r="2.5"/><path d="M3.5 19c.8-3 3-4.6 5.5-4.6s4.7 1.6 5.5 4.6M14.5 15.2c.6-.2 1.3-.3 2-.3 2 0 3.5 1.2 4 3.6"/></svg>',
+ leisure:'<svg viewBox="0 0 24 24"><path d="M4 6.5c2.6-1 5.3-1 8 .8 2.7-1.8 5.4-1.8 8-.8V18c-2.6-1-5.3-1-8 .8-2.7-1.8-5.4-1.8-8-.8z"/><path d="M12 7.3v11.5"/></svg>',
+ autonomy:'<svg viewBox="0 0 24 24"><path d="M4 12.5 20 5l-4.5 15-3.8-6.2z"/><path d="m11.7 13.8 3.8-4"/></svg>',
+ memory:'<svg viewBox="0 0 24 24"><path d="M12 7v5l3 2"/><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9"/><path d="M4.5 4.5V9H9"/></svg>',
+ lab:'<svg viewBox="0 0 24 24"><path d="M9.5 3.5h5M10.5 3.5v5.5L5 18.5a1.5 1.5 0 0 0 1.3 2h11.4a1.5 1.5 0 0 0 1.3-2L13.5 9V3.5"/><path d="M7.5 14.5h9"/></svg>',
+ settings:'<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>'};
+const LEAD={
+ overview:["Mit érez most, és miért — egy pillantásra.","What it feels right now, and why — at a glance."],
+ feelings:["Aktív érzések, szükségletek és pontosan az a szöveg, amit a modell minden körben kap.","Active feelings, needs, and the exact text the model gets every turn."],
+ rels:["Kihez hogyan kötődik. A ✎ gombbal kézzel is állítható — minden módosítás naplózódik.","How it feels about each person. Editable with ✎ — every change is logged."],
+ leisure:["Mit csinál magától, ha unatkozik, mennyire élvezte, és mi alakítja az ízlését.","What it does on its own when bored, how much it enjoyed it, what shapes its taste."],
+ autonomy:["Mikor írna magától, kinek, és mi tartja vissza.","When it would write first, to whom, and what holds it back."],
+ memory:["Minden esemény: mi történt, minek értékelte, és milyen érzés lett belőle.","Every event: what happened, how it was appraised, which feeling it caused."],
+ lab:["Kísérletezés: kitalált ingerek, idő léptetése. Élő agenten valódi emléket hoz létre.","Experiments: fake stimuli, moving time. On a live agent this creates real memories."],
+ settings:["A temperamentum: mennyire érzékeny, mire, milyen gyorsan nyugszik meg.","Temperament: how sensitive, to what, how quickly it calms down."]};
+function buildTabs(){
+  $("#tabs").innerHTML = TABS.map((k,i)=>`<a data-tab="${k}" class="${k===tab?"on":""}" title="${t("tab_"+k)} (${i+1})">${ICON[k]||""}<span>${t("tab_"+k)}</span><span class="badge" id="b-${k}" style="display:none"></span><kbd>${i+1}</kbd></a>`).join("");
+  document.querySelectorAll(".page").forEach(p=>p.classList.toggle("on",p.id==="p-"+tab));
+  $("#pageTitle").textContent=t("tab_"+tab); $("#pageLead").textContent=(LEAD[tab]||["",""])[HU()?0:1];
+  document.title=`${t("tab_"+tab)} · ${(temp&&temp.name)||agent||"limbic"} · limbic`;
+}
+$("#tabs").addEventListener("click",e=>{ const a=e.target.closest("a"); if(!a) return; tab=a.dataset.tab; localStorage.setItem("limbic.tab",tab); history.replaceState(null,"","#"+tab); buildTabs(); render(); });
+function badge(k,txt,hot){ const b=$("#b-"+k); if(!b) return; if(txt===""||txt===null||txt===0){ b.style.display="none"; return; } b.style.display="inline-block"; b.textContent=txt; b.classList.toggle("hot",!!hot); }
+
+function applyI18n(){
+  document.querySelectorAll("[data-t]").forEach(e=>e.textContent=t(e.dataset.t));
+  $("#langBtn").textContent = HU()?"EN":"HU";
+  $("#evSearch").placeholder=t("search"); $("#speaker").placeholder=HU()?"ki írja":"speaker"; $("#text").placeholder=HU()?"üzenet → értékelő":"message → appraiser";
+  const o=$("#evVal").options; o[0].text=t("v_all"); o[1].text=t("v_pos"); o[2].text=t("v_neg");
+  $("#autoBtn").textContent = auto? t("auto_on"):t("auto_off"); $("#pulse").classList.toggle("off",!auto);
+  buildTabs();
+}
+
+// ---------------------------------------------------------------- render
+function setAura(s){
+  const p=Math.max(-1,Math.min(1,s.mood.p)), a=Math.max(-1,Math.min(1,s.mood.a));
+  const hue = p>=0 ? 175-(175-28)*p : 175+(232-175)*(-p);      // sad: cold blue · calm: teal · happy: warm peach
+  const sat = 45+30*Math.abs(p)+10*Math.max(0,a);
+  const spd = 11-6*((a+1)/2);                                    // aroused: faster breathing
+  const r=document.documentElement.style; r.setProperty("--mh",hue.toFixed(0)); r.setProperty("--ms",sat.toFixed(0)+"%"); r.setProperty("--spd",spd.toFixed(1)+"s");
+  $("#whoSub").textContent=(HU()?s.label_hu:s.label)+" · "+(HU()?s.energy_hu:s.energy);
+}
+function render(){
+  if(!state) return;
+  const s=state; setAura(s);
+  // badges
+  const feelN=s.emotions.filter(e=>e.i>=0.08).length;
+  badge("feelings",feelN||"",false);
+  const pend=(s.intents||[]).filter(i=>i.status==="pending").length; badge("autonomy",pend||"",pend>0);
+  const L=s.leisure||{}; badge("leisure", L.current? (L.current.status==="running"?"●":"❚❚") : ((s.drives.fatigue||0)>=0.8?"z":""), L.current&&L.current.status==="running");
+  badge("overview", s.alerts.length? "!" : "", s.alerts.length>0);
+  const r={overview:renderOverview,feelings:renderFeelings,rels:renderRels,leisure:renderLeisure,autonomy:renderAutonomy,memory:renderEvents,lab:()=>{},settings:()=>{}}[tab];
+  r && r();
+}
+
+// ---------- overview
+const ACT = () => ({web:HU()?"netes olvasás":"web reading",lector:HU()?"olvasás (lector)":"reading (lector)",journal:HU()?"naplóírás":"journal",code:HU()?"scriptelés":"scripts"});
+const topicOf = x => { const b=(x&&x.bookmark)||{}; return x&&(x.topic||b.topic||b.slug)||""; };
+function nowActivity(){
+  const s=state, L=s.leisure||{}, c=L.current, th=s.thread;
+  const talkIdle = th ? (s.t-Math.max(th.last_user||0,th.last_agent||0))/60 : 1e9;
+  if(th && talkIdle < 20) return {v:HU()?"beszélget":"talking", sub:`${esc(th.partner||"?")}${th.topic?" · "+esc(th.topic):""} · ${ago(talkIdle*60)}`, kind:"talk"};
+  if(c && c.status==="running") return {v:ACT()[c.activity]||c.activity, sub:(topicOf(c)?esc(topicOf(c))+" · ":"")+(HU()?"szabadidő, ":"free time, ")+ago(s.t-(c.resumed||c.started)), kind:"leisure"};
+  if((s.drives.sleepiness||0)>=0.6 && !(c&&c.status==="running")) return {v:HU()?"álmos, pihen":"sleepy", sub:HU()?`álmosság ${pct(s.drives.sleepiness)}%`:`sleepiness ${pct(s.drives.sleepiness)}%`, kind:"rest"};
+  if((s.drives.fatigue||0)>=0.8 && !(c&&c.status==="running")) return {v:HU()?"kimerült":"worn out", sub:HU()?`kimerültség ${pct(s.drives.fatigue)}%`:`exhaustion ${pct(s.drives.fatigue)}%`, kind:"rest"};
+  if(c && c.status==="paused") return {v:HU()?"semmi (félretett dolog)":"idle (paused activity)", sub:(ACT()[c.activity]||c.activity)+(topicOf(c)?" · "+esc(topicOf(c)):""), kind:"idle"};
+  return {v:HU()?"nem csinál semmit":"idle", sub: th? (HU()?"utolsó beszélgetés ":"last talk ")+ago(talkIdle*60) : "", kind:"idle"};
+}
+function renderOverview(){
+  const s=state, hu=HU();
+  $("#ovMood").textContent = hu? s.label_hu : s.label;
+  $("#ovMoodSub").textContent = (hu? s.energy_hu : s.energy) + ` · p ${s.mood.p>=0?"+":""}${s.mood.p.toFixed(2)}`;
+  $("#ovBase").textContent = hu? s.baseline_label_hu : s.baseline_label;
+  const na=nowActivity(); $("#ovNow").textContent=na.v; $("#ovNowSub").innerHTML=na.sub;
+  if(s.alerts.length){ $("#ovAlert").innerHTML=`<span style="color:var(--bad)">${hu?"figyelem":"attention"}</span>`; $("#ovAlertSub").innerHTML=s.alerts.map(a=>`<span class="tag alert">${esc(alertName(a))}</span>`).join(" "); }
+  else { $("#ovAlert").innerHTML=`<span style="color:var(--good)">${hu?"rendben":"ok"}</span>`; $("#ovAlertSub").textContent = `${s.events} ${hu?"esemény összesen":"events total"}`; }
+  $("#ovSummary").innerHTML = summaryText();
+  // pull: emotion contributions to pleasure
+  const gain=T("emotion_gain")||1.5;
+  const items=s.emotions.map(e=>({e, v:gain*e.i*((EMO[e.name]||[0])[0])})).filter(x=>Math.abs(x.v)>=0.005).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,8);
+  const mx=Math.max(0.15,...items.map(x=>Math.abs(x.v)));
+  $("#ovPull").innerHTML = (items.length? items.map(({e,v})=>`<div class="kv"><b style="color:${emoCol(e.name)}">${emoName(e.name)}${e.target?` <span class="sub">${esc(e.target)}</span>`:""}</b>${cbar(v/mx,v>0?"var(--good)":"var(--bad)")}<span class="num">${v>=0?"+":""}${v.toFixed(2)}</span></div>`).join("") : `<div class="empty">${hu?"Nincs aktív érzés: a hangulat a háttérhangulat felé tart.":"No active feelings: mood drifts to the background."}</div>`)
+    + `<div class="sub" style="margin-top:8px">${hu?"Háttérhangulat":"Background"}: ${s.baseline.p>=0?"+":""}${s.baseline.p.toFixed(2)} · ${hu?"a hangulat ide + az érzések felé mozog, kb. 1,5 órás késéssel":"mood moves towards this + the feelings, lagging ~1.5 h"}</div>`;
+  drawCharts();
+}
+function alertName(a){ const m={baseline_crisis:HU()?"háttérhangulat krízisben":"background in crisis",mood_anguished:HU()?"gyötrő hangulat":"anguished mood",isolated:HU()?"elszigetelt":"isolated"}; return m[a]||a; }
+function summaryText(){
+  const s=state, hu=HU(), d=s.drives, L=s.leisure||{};
+  const name = (T("name")||agent);
+  const parts=[];
+  parts.push(hu? `<b>${esc(name)}</b> most <b>${esc(s.label_hu)}</b> (${esc(s.energy_hu)}), a háttérhangulata <b>${esc(s.baseline_label_hu)}</b>.`
+               : `<b>${esc(name)}</b> is <b>${esc(s.label)}</b> (${esc(s.energy)}), background <b>${esc(s.baseline_label)}</b>.`);
+  const top=s.emotions.filter(e=>e.i>=0.12).slice(0,3);
+  if(top.length) parts.push((hu?"Leginkább ezt érzi: ":"Strongest feelings: ")+top.map(e=>`<b style="color:${emoCol(e.name)}">${emoName(e.name)}</b>${e.target?(hu?` (${esc(e.target)} felé)`:` (towards ${esc(e.target)})`):""}`).join(", ")+".");
+  else parts.push(hu?"Nincs benne erős érzés.":"No strong feelings right now.");
+  const needs=[];
+  if(d.social>0.6) needs.push(hu?"hiányzik neki a társaság":"misses company");
+  if(d.novelty>0.6) needs.push(hu?"valami újra vágyik":"craves something new");
+  if(d.fatigue>0.5){ const src=state.fatigue_src||{}; const top=Object.keys(src).sort((a,b)=>src[b]-src[a])[0];
+    needs.push(hu?({work:"elfáradt a munkában",social:"elfárasztotta a sok beszélgetés",leisure:"elfáradt a szabadidős dolgokban"}[top]||"fáradt"):"is tired"); }
+  if((d.sleepiness||0)>0.6) needs.push(hu?"álmos":"sleepy"); else if((d.sleepiness||0)>0.3) needs.push(hu?"kezd lecsendesedni":"winding down");
+  if((d.recognition||0)>0.7) needs.push(hu?"jólesne egy kis elismerés":"would like some appreciation");
+  if(needs.length) parts.push((hu?"Szükségletek: ":"Needs: ")+needs.join(", ")+".");
+  const miss=Object.entries(s.relationships).filter(([n,r])=>r.is_person&&(r.longing||0)>(T("longing_feel_threshold")||0.35));
+  if(miss.length) parts.push((hu?"Hiányzik neki: ":"Misses: ")+miss.map(([n,r])=>`<b>${esc(n)}</b> (${ago(s.t-r.last_seen)})`).join(", ")+".");
+  const na=nowActivity();
+  if(na.kind==="leisure") parts.push(hu?`Épp a szabadidejét tölti: <b>${esc(na.v)}</b>.`:`Spending free time: <b>${esc(na.v)}</b>.`);
+  else if(na.kind==="rest") parts.push(hu?"Fáradt: legfeljebb ahhoz van kedve, amit nagyon szeret.":"Tired: only up for what it really loves.");
+  const last=(L.log||[])[0];
+  if(last) parts.push((hu?"Legutóbb szabadidejében: ":"Last free-time activity: ")+`${esc(ACT()[last.activity]||last.activity)}${last.topic?" ("+esc(String(last.topic))+")":""}, ${ago(s.t-last.end)} — ${enjoyWord(last.enjoy)}.`);
+  const pend=(s.intents||[]).filter(i=>i.status==="pending");
+  if(pend.length) parts.push(hu?`Magától írni akar: ${pend.map(i=>esc(i.target)).join(", ")}.`:`Wants to message: ${pend.map(i=>esc(i.target)).join(", ")}.`);
+  if(s.alerts.length) parts.push(`<span style="color:var(--bad)">${hu?"Figyelmeztetés":"Alert"}: ${s.alerts.map(alertName).join(", ")}.</span>`);
+  return parts.join(" ");
+}
+function enjoyWord(e){ return HU()? (e>0.5?"nagyon élvezte":e>0.25?"élvezte":e>-0.1?"elment":"nem tetszett") : (e>0.5?"loved it":e>0.25?"enjoyed it":e>-0.1?"it was ok":"didn't like it"); }
+
+// ---------- feelings
+const DRIVE_INFO = () => HU()? {
+  social:["magától nő; beszélgetés elégíti ki","60% felett magány"],novelty:["magától nő; új téma, olvasás elégíti ki","60% felett unalom"],
+  competence:["magától nő; sikeres feladat elégíti ki","60% felett „nem csináltam semmi hasznosat”"],
+  fatigue:["munka teljesen, beszélgetés és olvasás kevésbé fáraszt; ami leköti, kevésbé; ~3 óra alatt felére csökken","30% felett „kezd elfáradni”, 50% felett nem kezdene magától nagyobb munkába, 80% felett kimerült — de amit szeret, arra fáradtan is van energiája"],
+  sleepiness:[`napszakhoz kötött: lefekvés (${(T("sleep_hours")||[23,7])[0]}:00) előtt nő, hajnalban a legerősebb, ébredés után eltűnik`,"30% felett lecsendesedik · 60% felett álmos, nem kezd új dologba"],
+  recognition:["magától nő; dicséret, köszönet elégíti ki","70% felett elismerésre vágyik"],
+  intimacy:["csak ha be van kapcsolva; gyengéd szavak elégítik ki","60% felett közelségre vágyik"],
+  libido:["csak ha be van kapcsolva; szavak részben elégítik ki","60% felett vágy"]} : {
+  social:["grows by itself; satisfied by conversation","above 60%: loneliness"],novelty:["grows by itself; new topics, reading","above 60%: boredom"],
+  competence:["grows by itself; satisfied by successful tasks","above 60%: feels useless"],
+  fatigue:["work tires fully, talk and reading less; engaging things less; halves in ~3 h","above 30% getting tired, above 50% no bigger work on her own, above 80% worn out — loved things still get energy"],
+  sleepiness:["time of day: rises before bedtime, worst in the small hours, gone after waking","above 30% winding down · above 60% sleepy"],
+  recognition:["grows; satisfied by praise, thanks","above 70%: wants appreciation"],intimacy:["only if enabled; tender words","above 60%"],libido:["only if enabled","above 60%"]};
+const DRIVE_MARK = {social:[.6],novelty:[.6],competence:[.6],fatigue:[.3,.5,.8],sleepiness:[.3,.6],recognition:[.7],intimacy:[.6],libido:[.6]};
+const DC={social:"#3ddc97",novelty:"#4cc3ff",competence:"#ffd23f",fatigue:"#ff4d6d",sleepiness:"#9a7bff",recognition:"#ff7a1a",intimacy:"#ff8fc7",libido:"#ff3fa4"};
+function fatigueSources(){
+  const src=state.fatigue_src||{}, tot=Object.values(src).reduce((a,b)=>a+b,0); if(tot<0.01) return "";
+  const nm=HU()?{work:"munka",social:"beszélgetés",leisure:"szabadidő",other:"egyéb (olvasott, történt)"}:{work:"work",social:"talking",leisure:"free time",other:"other"};
+  const col={work:"#ffd23f",social:"#3ddc97",leisure:"#e0a040",other:"#8d879b"};
+  const parts=Object.entries(src).sort((a,b)=>b[1]-a[1]);
+  return `<div class="sub" style="margin-top:10px">${HU()?"Mitől fáradt (a kimerültség forrásai)":"Where the exhaustion comes from"}</div>
+    <div class="bar" style="height:12px;display:flex;overflow:hidden">${parts.map(([k,v])=>`<i style="position:static;display:block;width:${v/tot*100}%;background:${col[k]||"#888"}"></i>`).join("")}</div>
+    <div class="legend">${parts.map(([k,v])=>`<span style="--c:${col[k]||"#888"}">${nm[k]||k} ${Math.round(v/tot*100)}%</span>`).join("")}</div>`;
+}
+function halfLifeMin(e){ const spec=EMO[e.name]; if(!spec) return null; return spec[3]/Math.max(T("recovery")||1,1e-6)/(1+(T("peak_fade")??2)*e.i); }
+let feelEditing=false;
+function feelEdit(){
+  const s=state, hu=HU(); feelEditing=!feelEditing; const box=$("#feelEd");
+  if(!feelEditing){ box.innerHTML=""; renderFeelings(); return; }
+  const adult=T("adult_enabled");
+  const names=Object.keys(EMO).filter(n=>adult||!["desire","temptation"].includes(n));
+  const people=Object.entries(s.relationships).filter(([n,r])=>r.is_person||r.fictional).map(([n])=>n);
+  const sl=(id,v,lo,hi)=>`<input type="range" min="${lo}" max="${hi}" step="0.01" value="${(+v).toFixed(2)}" data-orig="${(+v).toFixed(2)}" id="${id}" style="flex:1" oninput="this.nextElementSibling.textContent=(+this.value).toFixed(2)"><span class="num">${(+v).toFixed(2)}</span>`;
+  box.innerHTML=`<div class="warnbox" style="margin:6px 0">${hu?"Kézi beállítás: azonnal hat, utána az érzés a szokásos módon halványul. 0 = törlés. Bekerül az emlékei közé (operator_edit).":"Manual: takes effect now, then fades as usual. 0 = remove. Logged."}</div>
+   ${s.emotions.map((e,i)=>`<div class="row"><b style="width:150px;color:${emoCol(e.name)}">${emoName(e.name)}${e.target?" · "+esc(e.target):""}</b>${sl("fe"+i,e.i,0,1)}</div>`).join("")}
+   <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px"><select id="feNew">${names.map(n=>`<option value="${n}">${emoName(n)}</option>`).join("")}</select>
+     <select id="feTgt"><option value="">${hu?"(senki felé)":"(no target)"}</option>${people.map(n=>`<option>${esc(n)}</option>`).join("")}</select>
+     ${sl("feNewI",0.4,0,1)}</div>
+   <div class="sub">${hu?"Új érzés hozzáadása: ha az erősség nem 0, mentéskor létrejön. Célpontot csak a személyhez kötött érzések használnak (pl. gyengédség, harag, hiányérzet).":"Add a feeling; target used only by targeted ones."}</div>
+   <h4 style="margin:10px 0 4px">${hu?"Hangulat":"Mood"}</h4>
+   ${["p","a","d"].map(ax=>`<div class="row"><b style="width:150px">${t({p:"pleasure",a:"arousal",d:"dominance"}[ax])}</b>${sl("fm"+ax,s.mood[ax],-1,1)}</div>`).join("")}
+   <h4 style="margin:10px 0 4px">${hu?"Háttérhangulat (lassan változó alap)":"Background mood"}</h4>
+   ${["p","a","d"].map(ax=>`<div class="row"><b style="width:150px">${t({p:"pleasure",a:"arousal",d:"dominance"}[ax])}</b>${sl("fb"+ax,s.baseline[ax],-1,1)}</div>`).join("")}
+   <div class="row" style="margin-top:8px"><button class="primary small" onclick="feelSave()">${hu?"Mentés":"Save"}</button><button class="ghost small" onclick="feelEdit()">${hu?"Mégse":"Cancel"}</button></div>`;
+}
+async function feelSave(){
+  const s=state, hu=HU(), done=[]; const ch=id=>{const e=document.getElementById(id); return e && e.value!==e.dataset.orig ? +e.value : null;};
+  for(const [i,e] of s.emotions.entries()){ const v=ch("fe"+i); if(v!==null){ await api(`/api/agents/${agent}/emotion`,{method:"POST",body:JSON.stringify({name:e.name,target:e.target,intensity:v})}); done.push(emoName(e.name)); } }
+  const nv=+$("#feNewI").value;
+  if(ch("feNewI")!==null && nv>0){ await api(`/api/agents/${agent}/emotion`,{method:"POST",body:JSON.stringify({name:$("#feNew").value,target:$("#feTgt").value||null,intensity:nv})}); done.push("+"+emoName($("#feNew").value)); }
+  const mood={}; ["p","a","d"].forEach(ax=>{ const a=ch("fm"+ax); if(a!==null) mood[ax]=a; const b=ch("fb"+ax); if(b!==null) mood["baseline_"+ax]=b; });
+  if(Object.keys(mood).length){ await api(`/api/agents/${agent}/mood`,{method:"POST",body:JSON.stringify(mood)}); done.push(hu?"hangulat":"mood"); }
+  feelEditing=false; $("#feelEd").innerHTML=""; toast(done.length? "✓ "+done.join(", ") : (hu?"nem változott semmi":"nothing changed")); refresh(true);
+}
+let needsEditing=false;
+function needsEdit(){
+  const s=state, hu=HU(); needsEditing=!needsEditing;
+  if(!needsEditing){ renderFeelings(); return; }
+  const info=DRIVE_INFO();
+  $("#drives").innerHTML=`<div class="warnbox" style="margin:6px 0">${hu?"Kézi beállítás: azonnal hat, utána a szükségletek a szokott módon nőnek / teljesülnek tovább. Bekerül az emlékei közé.":"Manual: takes effect now, then needs evolve as usual. Logged."}</div>`+
+    Object.entries(s.drives).filter(([k])=>!(k==="intimacy"&&!T("romance_enabled"))&&!(k==="libido"&&!T("adult_enabled"))).map(([k,v])=>
+    `<div class="row"><b style="width:120px;color:${DC[k]||"inherit"}">${t(k)}</b><input type="range" min="0" max="1" step="0.01" value="${(+v).toFixed(2)}" data-orig="${(+v).toFixed(2)}" data-drive="${k}" style="flex:1" oninput="this.nextElementSibling.textContent=(+this.value).toFixed(2)"><span class="num">${(+v).toFixed(2)}</span></div>`).join("")+
+    `<div class="row" style="margin-top:8px"><button class="primary small" onclick="needsSave()">${hu?"Mentés":"Save"}</button><button class="ghost small" onclick="needsEdit()">${hu?"Mégse":"Cancel"}</button></div>`;
+}
+async function needsSave(){
+  const body={}; document.querySelectorAll("#drives [data-drive]").forEach(i=>{ if(i.value!==i.dataset.orig) body[i.dataset.drive]=+i.value; });
+  needsEditing=false;
+  if(Object.keys(body).length){ await api(`/api/agents/${agent}/drives`,{method:"POST",body:JSON.stringify(body)}); toast("✓ "+Object.keys(body).map(t).join(", ")); }
+  refresh(true);
+}
+window.needsSave=needsSave;
+window.needsEdit=needsEdit; window.feelEdit=feelEdit; window.feelSave=feelSave;
+function renderFeelings(){
+  const s=state, hu=HU();
+  if(feelEditing) return;
+  $("#emotions").innerHTML = s.emotions.length ? s.emotions.map(e=>{
+    const hl=halfLifeMin(e), sus=e.sustained || e.cause==="unmet need" || /haven't heard/.test(e.cause||"");
+    return `<div class="emo"><div class="top"><b style="color:${emoCol(e.name)}">${emoName(e.name)}${e.target?` <span class="sub">${hu? esc(e.target)+" "+t("toward") : t("toward")+" "+esc(e.target)}</span>`:""}</b>
+      <span class="num">${pct(e.i)}%</span></div>${bar(e.i,emoCol(e.name))}
+      <div class="cause">${e.cause && e.cause!=="unmet need"? esc(e.cause) : (hu?"kielégítetlen szükségletből":"from an unmet need")}</div>
+      <div class="row" style="margin-top:4px">${sus?`<span class="tag info">${hu?"fennálló — amíg az ok tart":"sustained while the cause lasts"}</span>`:hl?`<span class="tag">${hu?"felére csökken kb.":"halves in ~"} ${dur(hl)}</span>`:""}
+      <span class="tag">${(EMO[e.name]||[0])[0]>=0?(hu?"kellemes":"pleasant"):(hu?"kellemetlen":"unpleasant")}</span></div></div>`;}).join("")
+    : `<div class="empty">${hu?"Nincs aktív érzés.":"No active feelings."}</div>`;
+  const info=DRIVE_INFO();
+  if(!needsEditing) $("#drives").innerHTML = Object.entries(s.drives).filter(([k,v])=>!(k==="intimacy"&&!T("romance_enabled")) && !(k==="libido"&&!T("adult_enabled")))
+    .map(([k,v])=>`<div class="kv"><b>${t(k)}</b>${bar(v,DC[k],DRIVE_MARK[k]||[])}<span class="num">${pct(v)}%</span><span class="ex">${(info[k]||[""])[0]} · ${(info[k]||["",""])[1]}</span></div>`).join("")
+    + fatigueSources();
+  $("#pad").innerHTML = padRows(s.mood); $("#basePad").innerHTML = padRows(s.baseline);
+  const MI = hu? {verbosity:["bőbeszédűség",[.35,.7],"<35% rövidebb, szárazabb · >70% beszédes"],initiative:["kezdeményezés",[.25,.65],"<25% alig kezdeményez · >65% magától javasol"],
+      warmth:["melegség",[.35,.75],"<35% hűvösebb · >75% meleg, nyitott (a beszélgetőtárs felé)"],patience:["türelem",[.4],"<40% kurtább az ismétlésre"],
+      optimism:["optimizmus",[.3,.8],"<30% árnyoldalt lát · >80% lehetőségeket lát"],caution:["óvatosság",[.65],">65% kerüli a kockázatos javaslatokat"],
+      playfulness:["játékosság",[.65],">65% könnyen jön a poén"],curiosity:["kíváncsiság",[.7],">70% beleássa magát új témákba"],temperature_delta:["temp. eltolás",[],"a generálás hőmérsékletének javasolt eltolása"]}
+    : {verbosity:["verbosity",[.35,.7],"<35% shorter · >70% talkative"],initiative:["initiative",[.25,.65],"<25% passive · >65% suggests things"],warmth:["warmth",[.35,.75],"<35% cooler · >75% warm"],
+      patience:["patience",[.4],"<40% curt"],optimism:["optimism",[.3,.8],"<30% pessimistic · >80% optimistic"],caution:["caution",[.65],">65% avoids risk"],
+      playfulness:["playfulness",[.65],">65% jokes"],curiosity:["curiosity",[.7],">70% digs in"],temperature_delta:["temp. delta",[],"suggested sampling temperature shift"]};
+  $("#mods").innerHTML = Object.entries(s.modulators).map(([k,v])=>{ const [nm,marks,ex]=MI[k]||[k,[],""];
+    return k==="temperature_delta"? `<div class="kv"><b>${nm}</b>${cbar(v/0.2,"var(--yel)")}<span class="num">${v>=0?"+":""}${v.toFixed(2)}</span><span class="ex">${ex}</span></div>`
+      : `<div class="kv"><b>${nm}</b>${bar(v,"var(--acc2)",marks)}<span class="num">${pct(v)}</span><span class="ex">${ex}</span></div>`;}).join("");
+}
+
+// ---------- relationships
+function relKind(n,r){ return r.fictional? "char" : r.is_person? "person" : "other"; }
+function renderRels(){
+  const s=state, hu=HU();
+  const rels=Object.entries(s.relationships).sort((a,b)=>(b[1].interactions||0)-(a[1].interactions||0));
+  const people=rels.filter(([n,r])=>relKind(n,r)==="person"), chars=rels.filter(([n,r])=>relKind(n,r)==="char"), others=rels.filter(([n,r])=>relKind(n,r)==="other");
+  const desc=r=>{ const p=[]; if(r.affection>0.5)p.push(hu?"erősen kötődik":"strongly attached"); else if(r.affection>0.2)p.push(hu?"kedveli":"likes"); if(r.trust>0.3)p.push(hu?"megbízik benne":"trusts"); else if(r.trust<-0.2)p.push(hu?"nem bízik benne":"distrusts");
+    if(r.resentment>0.2)p.push(hu?"neheztel rá":"resents"); if(r.fear>0.2)p.push(hu?"tart tőle":"wary"); return p.join(", ")||(hu?"semleges":"neutral"); };
+  if(relEditing) return;   // don't redraw under the operator's hands
+  $("#people").innerHTML = people.length? people.map(([n,r])=>`<div class="rel"><div class="row"><div class="name">${esc(n)}</div><div class="sp"></div><button class="ghost small" onclick="relEdit('${esc(n)}')">✎ ${hu?"Szerkesztés":"Edit"}</button></div><div id="relEd-${esc(n)}"></div>
+    <div class="sub" style="margin-bottom:6px">${desc(r)} · ${r.interactions||0} ${t("interactions")} · ${t("last_seen")}: ${ago(s.t-r.last_seen)}${r.last_channel?` · ${t("last_channel")}: ${esc(r.last_channel)}`:""}${r.unanswered?` · <span style="color:var(--yel)">${t("unanswered")}: ${r.unanswered}</span>`:""}</div>
+    <div class="kv"><b>${t("affection")}</b>${bar(r.affection,"var(--good)")}<span class="num">${pct(r.affection)}</span></div>
+    <div class="kv"><b>${t("trust")}</b>${cbar(r.trust,"var(--blue)")}<span class="num">${pct(r.trust)}</span></div>
+    <div class="kv"><b>${t("resentment")}</b>${bar(r.resentment,"var(--bad)")}<span class="num">${pct(r.resentment)}</span></div>
+    <div class="kv"><b>${t("fear")}</b>${bar(r.fear,"var(--vio)")}<span class="num">${pct(r.fear)}</span></div>
+    <div class="kv"><b>${t("longing")}</b>${bar(r.longing||0,"#7f9cf5",[T("longing_feel_threshold")||.35,T("outreach_threshold")||.6])}<span class="num">${pct(r.longing)}</span></div>
+    ${(T("romance_enabled")||T("adult_enabled"))?`<div class="kv"><b>${t("intimacy")}</b>${bar(r.intimacy||0,"#ff8fc7")}<span class="num">${pct(r.intimacy)}</span></div>
+    <div class="kv"><b>${t("attraction")}</b>${bar(r.attraction||0,"#ff3fa4")}<span class="num">${pct(r.attraction)}</span></div>`:""}
+    <div style="margin-top:6px"><label class="tog"><input type="checkbox" ${r.reachable?"checked":""} onchange="relSet('${esc(n)}',{reachable:this.checked})">${t("reachable")}</label>
+    <label class="tog"><input type="checkbox" ${(r.consent||{}).romance?"checked":""} onchange="relSet('${esc(n)}',{consent:{romance:this.checked}})">${t("c_romance")}</label>
+    <label class="tog"><input type="checkbox" ${(r.consent||{}).adult?"checked":""} onchange="relSet('${esc(n)}',{consent:{adult:this.checked}})">${t("c_adult")}</label></div>
+    <input value="${esc(r.contact||"")}" placeholder="${t("contact")}" style="width:100%;margin-top:4px;font-size:12px" onchange="relSet('${esc(n)}',{contact:this.value})"></div>`).join("")
+    : `<div class="empty">${hu?"Még senki.":"Nobody yet."}</div>`;
+  const small = list => list.length? `<table><tr><th></th><th>${t("affection")}</th><th>${t("resentment")}</th><th>${t("fear")}</th><th>${t("last_seen")}</th></tr>`+list.map(([n,r])=>`<tr><td><b>${esc(n)}</b></td><td>${bar(r.affection,"var(--good)")}</td><td>${bar(r.resentment,"var(--bad)")}</td><td>${bar(r.fear,"var(--vio)")}</td><td class="num">${ago(s.t-r.last_seen)}</td></tr>`).join("")+`</table>` : `<div class="empty">–</div>`;
+  $("#chars").innerHTML = small(chars); $("#others").innerHTML = small(others);
+  const sx=s.sexuality||{}, adult=T("adult_enabled");
+  $("#sexCard").style.display = adult? "block":"none";
+  const openDet=document.querySelector("#sexuality details[open]");
+  if(adult && !openDet){ const o=sx.openness||0, pt=T("openness_point")||.5;
+    const partners=Object.entries(s.relationships).filter(([n,r])=>r.is_person&&(r.consent||{}).adult);
+    $("#sexuality").innerHTML = `<div class="kv"><b>${hu?"nyitottság":"openness"}</b>${bar(o,"#ff3fa4",[pt])}<span class="num">${pct(o)}%</span>
+      <span class="ex">${hu?`Jó intim élményekből tanulja (jobban, ha nagy volt a vágya, és ha beteljesült), a határa utáni nyomásból erősebben visszatanulja. ${pct(pt)}% felett alacsony libidónál is vágyik a közelségre; a libidója akár ${(1+(T("openness_libido_gain")||1.5)).toFixed(1)}× gyorsabban töltődik. Lassan halványul (~${T("openness_half_life_d")||45} nap).`:"Learned from good intimate moments, unlearned harder from pressure past her no."}</span></div>
+      <details style="margin-top:6px"><summary>✎ ${hu?"nyitottság kézi beállítása":"set openness"}</summary>
+        <div class="row" style="margin-top:6px"><input type="range" id="openRange" min="0" max="1" step="0.01" value="${o.toFixed(2)}" style="flex:1" oninput="this.nextElementSibling.textContent=(+this.value).toFixed(2)"><span class="num">${o.toFixed(2)}</span>
+        <button class="primary small" onclick="openSave()">${hu?"Mentés":"Save"}</button></div></details>
+      <div class="row" style="margin-top:6px"><span class="tag good">${hu?"jó pillanat":"good"}: ${sx.good||0}</span><span class="tag alert">${hu?"nyomás":"pressure"}: ${sx.bad||0}</span>
+      <span class="tag">${hu?"libidó":"libido"} ${pct(s.drives.libido)}%</span>${sx.last?`<span class="sub">${hu?"utolsó jó élmény":"last good"} ${ago(s.t-sx.last)}</span>`:""}</div>
+      ${partners.map(([n,r])=>`<div class="kv"><b>${esc(n)} · ${t("attraction")}</b>${bar(r.attraction||0,"#ff3fa4")}<span class="num">${pct(r.attraction)}%</span></div>`).join("")}`; }
+  const th=s.thread;
+  if(!th){ $("#thread").innerHTML=`<div class="empty">${t("nothread")}</div>`; }
+  else { const idle=(s.t-th.last_user)/60;
+    $("#thread").innerHTML=`<div class="kv"><b>${t("partner")}</b><span>${esc(th.partner||"–")}${th.private?` <span class="tag">${t("private")}</span>`:""}</span><span></span></div>
+      <div class="kv"><b>${t("topic")}</b><span>${esc(th.topic||"–")}</span><span></span></div>
+      <div class="kv"><b>${t("engagement")}</b>${bar(th.engagement,"#ff9d00",[T("steer_threshold")||.45])}<span class="num">${pct(th.engagement)}</span></div>
+      <div class="kv"><b>${t("peak")}</b>${bar(th.peak,"#ff9d0088",[T("check_in_min_engagement")||.5])}<span class="num">${pct(th.peak)}</span></div>
+      <div class="sub">${th.messages} ${t("messages")} · ${t("idle")}: ${ago(idle*60)}${th.checked_in?" · ✓ check-in":""}</div>
+      ${(th.topics||[]).length>1?`<div class="sub" style="margin-top:4px">${th.topics.map(esc).join(" → ")}</div>`:""}
+      <div class="sub" style="margin-top:6px">${hu?"Bevonódás a jelölésnél felett terelne a téma felé; ha a csúcs elérte a jelölést és abbamarad, rákérdezhet.":"Above the mark it steers to the topic; if the peak passed the mark and it stops, it may check in."}</div>`;
+  }
+  $("#steering").innerHTML = (s.steering||[]).length ? `<div class="sub">${t("steer")}</div>`+s.steering.map(x=>`<span class="steer">${x.direction==="topic"?"↻ "+esc(x.topic):x.direction==="romance"?"♡ "+esc(x.target):"🔥 "+esc(x.target)} · ${pct(x.strength)}</span>`).join("") : "";
+}
+let relEditing=null;
+const REL_FIELDS=[["affection",0,1,"#3ddc97"],["trust",-1,1,"#4cc3ff"],["resentment",0,1,"#ff4d6d"],["fear",0,1,"#b57bff"],["longing",0,1,"#7f9cf5"],["intimacy",0,1,"#ff8fc7"],["attraction",0,1,"#ff3fa4"]];
+function relEdit(name){
+  const r=(state.relationships||{})[name]; if(!r) return; const hu=HU();
+  const box=document.getElementById("relEd-"+name);
+  if(relEditing===name){ relEditing=null; box.innerHTML=""; renderRels(); return; }
+  relEditing=name;
+  const adult=T("adult_enabled")||T("romance_enabled");
+  box.innerHTML=`<div class="warnbox" style="margin:6px 0">${hu?"Kézi beállítás: azonnal hat az érzéseire és a viselkedésére, és bekerül az emlékei közé (operator_edit).":"Manual setting: takes effect immediately and is logged (operator_edit)."}</div>`+
+    REL_FIELDS.filter(([k])=>adult||!["intimacy","attraction"].includes(k)).map(([k,lo,hi,c])=>`<label class="s" style="grid-template-columns:110px 1fr 46px"><span style="color:${c}">${t(k)}</span>
+      <input type="range" min="${lo}" max="${hi}" step="0.01" value="${(+r[k]||0).toFixed(2)}" data-orig="${(+r[k]||0).toFixed(2)}" data-rel="${k}" oninput="this.nextElementSibling.textContent=(+this.value).toFixed(2)"><span class="num">${(+r[k]||0).toFixed(2)}</span></label>`).join("")+
+    `<div class="row" style="margin-top:6px"><button class="primary small" onclick="relSave('${esc(name)}')">${hu?"Mentés":"Save"}</button><button class="ghost small" onclick="relEdit('${esc(name)}')">${hu?"Mégse":"Cancel"}</button></div>`;
+}
+async function relSave(name){
+  const body={}; document.querySelectorAll(`#relEd-${CSS.escape(name)} [data-rel]`).forEach(i=>{ if(i.value!==i.dataset.orig) body[i.dataset.rel]=+i.value; });
+  relEditing=null; if(!Object.keys(body).length){ renderRels(); return; }
+  await api(`/api/agents/${agent}/relationships/${encodeURIComponent(name)}`,{method:"PUT",body:JSON.stringify(body)});
+  toast("✓ "+name+": "+Object.keys(body).map(t).join(", ")); refresh(true);
+}
+window.relEdit=relEdit; window.relSave=relSave;
+async function openSave(){ const v=+$("#openRange").value; await api(`/api/agents/${agent}/sexuality`,{method:"POST",body:JSON.stringify({openness:v})}); toast("✓ "+(HU()?"nyitottság":"openness")+" "+v.toFixed(2)); refresh(false); }
+window.openSave=openSave;
+async function relSet(name, body){ await api(`/api/agents/${agent}/relationships/${encodeURIComponent(name)}`,{method:"PUT",body:JSON.stringify(body)}); toast("✓ "+name); refresh(false); }
+window.relSet=relSet;
+
+// ---------- leisure
+const REASON = () => HU()? {done:"befejezte",tired:"elfáradt","time is up":"lejárt az idő","not enjoying it":"nem élvezte","it's bringing me down":"lehúzta",
+  "not bored any more, and it's not that great":"már nem unatkozott",abandoned:"félbehagyta","had enough of it":"elég volt","nothing found":"nem talált semmit",
+  "end of what is prepared":"elfogyott az előkészített rész","lost interest":"elvesztette az érdeklődését","too tired for anything":"túl fáradt volt bármihez",sleepy:"elálmosodott","it isn't grabbing me":"nem kötötte le","written":"megírta","nothing prepared":"nem volt mit olvasni"} : {};
+function whyNot(){
+  const s=state, L=s.leisure||{}, hu=HU(), d=s.drives;
+  if(L.enabled===false) return ["", hu?"A szabadidő ki van kapcsolva a temperamentumban.":"Free time is disabled in the temperament."];
+  if(L.current && L.current.status==="running") return ["go", hu?`Épp csinál valamit: <b>${esc(ACT()[L.current.activity]||L.current.activity)}</b>.`:`Busy: <b>${esc(L.current.activity)}</b>.`];
+  const sl=d.sleepiness||0;
+  if(sl>=0.6) return ["rest", hu?`<b>Álmos</b> (${pct(sl)}%), késő van. Új dologba alig kezd bele; ha mégis, inkább naplót ír.`:`<b>Sleepy</b> (${pct(sl)}%). Hardly starts anything; journal at most.`];
+  if(d.fatigue>=0.55 && !(L.current&&L.current.status==="running")) return ["rest", hu?`<b>Fáradt</b> (${pct(d.fatigue)}%). Nincs kötelező pihenő: ha mégis belekezd valamibe, az inkább könnyű és kedvelt lesz (pl. olvasás), és a „semmit se csinálok” is erősebb választás.`:`<b>Tired</b> (${pct(d.fatigue)}%). No forced rest: if anything, something light and loved.`];
+  const th=s.thread, last=Math.max(s.last_interaction||0, th?th.last_agent||0:0);
+  const idleMin = th? (s.t-Math.max(th.last_user||0,th.last_agent||0))/60 : 1e9;
+  if(idleMin < (T("leisure_idle_min")||20)) return ["", hu?`Beszélgetés van (${ago(idleMin*60)}); ${Math.round(T("leisure_idle_min")||20)} perc csend után kezdhet bármibe.`:`In a conversation; needs ${T("leisure_idle_min")||20} min of quiet.`];
+  const lastEnd=(L.log||[])[0]?.end||0, gap=(s.t-lastEnd)/60;
+  if(lastEnd && gap < (T("leisure_gap_min")||30)) return ["", hu?`Nemrég fejezett be valamit (${ago(gap*60)}); két alkalom között ${T("leisure_gap_min")||30} perc szünet van.`:`Just finished something; ${T("leisure_gap_min")||30} min gap.`];
+  if((L.urge||0) < (L.urge_min||.12)) return ["", hu?`<b>Nem unatkozik</b> (nyugtalanság ${pct(L.urge)}% &lt; ${pct(L.urge_min)}%).`:`<b>Not bored</b> (${pct(L.urge)}% &lt; ${pct(L.urge_min)}%).`];
+  const p=Math.min(1,(T("leisure_eagerness")||.12)*(L.urge||0)*(L.gate||0));
+  const moodNote = (L.gate||0)<0.5 ? (hu?" A rossz hangulat miatt nagyon nincs kedve semmihez, és a „semmit se csinálok” is erős választás.":" Low mood: little appetite for anything.") : "";
+  return ["go", (hu?`<b>Bármikor belekezdhet.</b> Esély percenként kb. ${(p*100).toFixed(1)}% (várhatóan ~${p>0?Math.round(1/p):"∞"} percen belül).`:`<b>May start any time.</b> ~${(p*100).toFixed(1)}%/min.`)+moodNote];
+}
+function renderLeisure(){
+  const s=state, L=s.leisure||{}, hu=HU(), c=L.current;
+  let now="";
+  if(c){ const bm=c.bookmark||{};
+    now = `<div class="tile"><span class="v" style="font-size:20px">${esc(ACT()[c.activity]||c.activity)}</span>
+      <span class="s">${topicOf(c)?esc(topicOf(c))+" · ":""}<span class="tag ${c.status==="running"?"good":"warn"}">${c.status==="running"?(hu?"folyamatban":"running"):(hu?"félretéve":"paused")}</span></span></div>
+      <div class="kv"><b>${hu?"elkezdte":"started"}</b><span>${fmtT(c.started)} (${ago(s.t-c.started)})</span><span></span></div>
+      <div class="kv"><b>${hu?"lépések":"steps"}</b><span>${c.steps}</span><span></span></div>
+      <div class="kv"><b>${hu?"eddig élvezi":"enjoying so far"}</b>${cbar(c.enjoy_so_far||0,(c.enjoy_so_far||0)>=0?"var(--good)":"var(--bad)")}<span class="num">${(c.enjoy_so_far||0).toFixed(2)}</span></div>
+      ${c.want!==undefined?`<div class="kv"><b>${hu?"kedve vs. ár":"want vs. cost"}</b><span>${hu?"kedv":"want"} <b style="color:var(--good)">${(+c.want).toFixed(2)}</b> · ${hu?"ár":"cost"} <b style="color:var(--bad)">${(+c.cost).toFixed(2)}</b></span><span></span><span class="ex">${hu?"addig csinálja, amíg a kedve (élvezet + kíváncsiság) nagyobb, mint amibe a fáradtság miatt kerül":"continues while wanting it outweighs what it costs"}</span></div>`:""}
+      ${c.paused?`<div class="kv"><b>${hu?"félretette":"paused"}</b><span>${ago(s.t-c.paused)}${c.paused_by?" · "+esc(c.paused_by):""}${c.resume_requested?` · <span class="tag good">${hu?"folytatást kértek":"resume requested"}</span>`:""}</span><span></span></div>`:""}
+      ${bm.slug?`<div class="kv"><b>${hu?"könyvjelző":"bookmark"}</b><span>${esc(bm.slug)} · ${hu?"jelenet":"scene"} ${esc(bm.scene)}</span><span></span></div>`:""}
+      ${bm.visited?`<div class="kv"><b>${hu?"olvasott oldalak":"pages read"}</b><span>${bm.visited.length}</span><span></span></div>`:""}
+      ${(c.notes||[]).length?`<div class="sub" style="margin-top:6px">${hu?"Utolsó jegyzet":"Last note"}: ${esc(c.notes[c.notes.length-1])}</div>`:""}`;
+  } else now = `<div class="tile"><span class="v" style="font-size:20px">${hu?"nem csinál semmit":"idle"}</span></div>`;
+  const [cls,why]=whyNot();
+  $("#lsNow").innerHTML = now + `<div class="why ${cls}">${why}</div>`;
+  const d=s.drives;
+  $("#lsSignals").innerHTML = `
+    <div class="kv"><b>${hu?"nyugtalanság":"restlessness"}</b>${bar(L.urge||0,"#e0a040",[L.urge_min||.12])}<span class="num">${pct(L.urge)}%</span>
+      <span class="ex">${hu?`unalom + az üres órák nyugtalansága (kb. ${T("leisure_idle_tau_h")||3} órás léptékkel nő). A jelölés alatt nem kezd semmibe.`:"boredom + restlessness of empty hours. Below the mark it starts nothing."}</span></div>
+    <div class="kv"><b>${hu?"hangulati kapu":"mood gate"}</b>${bar(Math.min(1,(L.gate||0)/1.6),"#60b0e0",[1/1.6])}<span class="num">×${(L.gate||0).toFixed(2)}</span>
+      <span class="ex">${hu?"×1 semleges hangulatban; jókedvűen nagyobb, szomorúan ×0.3, depressziósan ×0.05.":"×1 neutral; more when cheerful, ×0.3 sad, ×0.05 depressed."}</span></div>
+    <div class="kv"><b>${t("fatigue")}</b>${bar(d.fatigue,"#ff4d6d",[])}<span class="num">${pct(d.fatigue)}%</span>
+      <span class="ex">${hu?"Nincs fix határ: fáradtan a megterhelő dolgok (net, scriptelés) drágák, a kedvelt, könnyű dolgok (olvasás) olcsók maradnak. Ami élvezetes, az a munka és a beszélgetés fáradtságából vissza is ad.":"No fixed line: tiredness makes demanding things expensive, loved light ones stay cheap."}</span></div>
+    <div class="kv"><b>${t("sleepiness")}</b>${bar(d.sleepiness||0,"#9a7bff",[.6])}<span class="num">${pct(d.sleepiness)}%</span>
+      <span class="ex">${hu?"napszakhoz kötött; erősen csökkenti a kedvet új dolgokhoz, 60% felett abbahagyja (a naplót kivéve).":"time of day; strongly damps starting things, stops above 60% (except journal)."}</span></div>
+    <div class="kv"><b>${t("novelty")}</b>${bar(d.novelty,"#4cc3ff",[.6])}<span class="num">${pct(d.novelty)}%</span>
+      <span class="ex">${hu?"újdonságigény: olvasás, új témák csökkentik.":"novelty need: reading and new topics lower it."}</span></div>
+    <div class="sub">${hu?"Napi korlát":"Daily cap"}: ${(L.log||[]).filter(e=>s.t-e.end<86400).length}/${T("leisure_max_per_day")||8} · ${hu?"max. hossz":"max length"} ${T("leisure_max_minutes")||25} ${hu?"perc":"min"} · ${hu?"tevékenységek":"activities"}: ${(T("leisure_activities")||[]).map(a=>esc(ACT()[a]||a)).join(", ")}</div>`;
+  const taste=Object.entries(L.taste||{}).sort((a,b)=>b[1].enjoy-a[1].enjoy);
+  $("#lsTaste").innerHTML = taste.length? taste.map(([a,v])=>`<div class="kv"><b>${esc(ACT()[a]||a)}</b>${cbar(v.enjoy||0,(v.enjoy||0)>=0?"var(--good)":"var(--bad)")}<span class="num">${(v.enjoy>=0?"+":"")+(v.enjoy||0).toFixed(2)}</span>
+      <span class="ex">${v.n||0}× · ${hu?"utoljára":"last"} ${v.last?ago(s.t-v.last):"–"}</span></div>`).join("")
+    + `<div class="sub" style="margin-top:6px">${hu?"Amit élvez, azt gyakrabban választja; amiből sokat csinált mostanában, attól kicsit eltelik.":"Liked things are picked more; recent repetition wears off."}</div>`
+    : `<div class="empty">${hu?"Még nincs tapasztalata.":"No experience yet."}</div>`;
+  const log=L.log||[];
+  $("#lsLog").innerHTML = log.length? `<table><tr><th>${t("time")}</th><th>${hu?"Mit":"What"}</th><th>${hu?"Hossz":"Length"}</th><th>${hu?"Élvezet":"Enjoy"}</th><th>${hu?"Miért állt le":"Why it stopped"}</th><th>${hu?"Saját értékelése":"Own verdict"}</th></tr>`+
+    log.map(e=>`<tr><td class="num" style="text-align:left;white-space:nowrap">${fmtT(e.start)}</td><td><b>${esc(ACT()[e.activity]||e.activity)}</b>${e.topic?`<div class="sub">${esc(String(e.topic))}</div>`:""}</td>
+      <td class="num">${dur((e.end-e.start)/60)} · ${e.steps} ${hu?"lépés":"steps"}</td>
+      <td style="min-width:110px">${cbar(e.enjoy,e.enjoy>=0?"var(--good)":"var(--bad)")}<div class="sub">${(e.enjoy>=0?"+":"")+e.enjoy.toFixed(2)} · ${enjoyWord(e.enjoy)}</div></td>
+      <td class="sub">${esc(REASON()[e.reason]||e.reason||"")}</td><td>${esc(e.summary||"")}</td></tr>`).join("")+`</table>`
+    : `<div class="empty">${hu?"Még nem csinált semmit szabadidejében.":"Nothing yet."}</div>`;
+}
+
+// ---------- autonomy
+function renderAutonomy(){
+  const s=state, hu=HU();
+  const today=(s.intents||[]).filter(i=>i.delivered && s.t-i.delivered<86400).length;
+  const qh=T("quiet_hours")||[];
+  const hr=new Date(s.t*1000).getHours(); const inQuiet= qh.length===2 && (qh[0]>qh[1]? (hr>=qh[0]||hr<qh[1]) : (hr>=qh[0]&&hr<qh[1]));
+  const kv=(k,v)=>`<div class="kv"><b>${k}</b><span>${v}</span><span></span></div>`;
+  $("#autRules").innerHTML =
+    kv(hu?"önállóság":"autonomy", T("autonomy_enabled")?`<span class="tag good">${hu?"be":"on"}</span>`:`<span class="tag">${hu?"ki":"off"}</span>`)+
+    kv(hu?"csendes órák":"quiet hours", qh.length===2?`${qh[0]}:00–${qh[1]}:00 ${inQuiet?`<span class="tag warn">${hu?"most csend van":"quiet now"}</span>`:""}`:"–")+
+    kv(hu?"ma kiküldve":"sent today", `${today} / ${T("max_outreach_per_day")??"?"}`)+
+    kv(hu?"megkeresési küszöb":"outreach threshold", `${hu?"hiányérzet":"longing"} ≥ ${pct(T("outreach_threshold"))}%`)+
+    kv(hu?"várakozás":"cooldown", `${T("outreach_cooldown_h")} ${hu?"óra, válasz nélkül ×":"h, ×"}${T("outreach_backoff")}${hu?"":" per unanswered"}`)+
+    kv(hu?"leállás":"stop after", `${T("max_unanswered")} ${hu?"megválaszolatlan után":"unanswered"}`)+
+    kv("check-in", `${T("check_in_after_min")} ${hu?"perc csend után, max.":"min idle, max"} ${T("check_in_window_h")} ${hu?"óráig":"h"}`)+
+    `<div class="sub" style="margin-top:6px">${hu?"A limbic csak eldönti, hogy írni szeretne; a csatlakoztatott agent-integráció továbbítja a saját hangján.":"limbic only decides; the connected agent integration delivers the message in the agent's voice."}</div>`;
+  const ppl=Object.entries(s.relationships).filter(([n,r])=>r.is_person).sort((a,b)=>(b[1].longing||0)-(a[1].longing||0));
+  $("#autPeople").innerHTML = ppl.length? ppl.map(([n,r])=>{
+    const blocked = !r.reachable? (hu?"nem írhat neki magától":"not reachable") : (r.unanswered||0)>=(T("max_unanswered")||3)? (hu?"leállt (válasz nélkül)":"stopped (unanswered)") : "";
+    return `<div class="kv"><b>${esc(n)}</b>${bar(r.longing||0,"#7f9cf5",[T("outreach_threshold")||.6])}<span class="num">${pct(r.longing)}%</span>
+      <span class="ex">${t("last_seen")} ${ago(s.t-r.last_seen)}${r.unanswered?` · ${t("unanswered")}: ${r.unanswered}`:""}${r.last_outreach?` · ${hu?"utoljára írt":"last outreach"} ${ago(s.t-r.last_outreach)}`:""}${blocked?` · <span style="color:var(--yel)">${blocked}</span>`:""}</span></div>`;}).join("")
+    : `<div class="empty">–</div>`;
+  const list=s.intents||[];
+  $("#intents").innerHTML = !list.length? `<div class="empty">${t("nointent")}</div>` : list.map(i=>{
+    const why = i.kind==="reach_out" ? `${t("why_miss")} · ${i.absent_h}h · ${t("longing")} ${pct(i.longing)}%${i.unanswered?` · ${t("unanswered")} ${i.unanswered}`:""}` : `${t("why_check")}: ${esc(i.topic||"–")} · ${i.idle_min} min · ${pct(i.engagement)}%`;
+    const btns = i.status==="pending" ? `<button class="small" onclick="intentDo(${i.id},'claim')">${t("claim")}</button> <button class="ghost small" onclick="intentDo(${i.id},'dismiss')">${t("dismiss")}</button>` : "";
+    const ST=hu?{pending:"függőben",delivered:"elküldve",answered:"válaszolt",ignored:"nem válaszolt",expired:"lejárt",dismissed:"elvetve",obsolete:"okafogyott"}:{};
+    return `<div class="intent ${i.status}"><div class="row"><b>${i.kind==="reach_out"?"✉ ":"❓ "}${esc(i.kind)} → ${esc(i.target)}</b><span class="tag">${esc(ST[i.status]||i.status)}</span><span class="sub">${fmtT(i.created)}</span><div class="sp"></div>${btns}</div><div class="sub">${why}${i.channel?" · "+esc(i.channel):""}</div></div>`;}).join("");
+}
+async function intentDo(id, action){
+  const r=await api(`/api/agents/${agent}/intents/${id}/${action}?lang=${lang}`,{method:"POST"});
+  if(action==="claim"){ $("#instr").style.display="block"; $("#instr").textContent=r.instruction; }
+  refresh();
+}
+window.intentDo=intentDo;
+
+// ---------- memory
+const SRC_NAME = () => HU()? {operator:"kézi beállítás",observe:"beszélgetés",story:"történet",autonomy:"önállóság",system:"rendszer",dashboard:"dashboard",api:"api",manual:"kézi",leisure:"szabadidő","leisure:web":"szabadidő · net","leisure:lector":"szabadidő · olvasás","leisure:journal":"szabadidő · napló"} : {};
+function renderEvents(){
+  const hu=HU();
+  const srcCount={}; for(const e of evs){ srcCount[e.source]=(srcCount[e.source]||0)+1; }
+  $("#evSources").innerHTML = Object.entries(srcCount).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<span class="chip ${evFilter.sources.has(k)?"on":""}" data-src="${esc(k)}">${esc(SRC_NAME()[k]||k)} · ${n}</span>`).join("");
+  const felt=evs.filter(e=>e.appraisal&&e.appraisal.valence!==undefined&&!(e.effects||{}).mundane);
+  const pos=felt.filter(e=>e.appraisal.valence>0.05).length, neg=felt.filter(e=>e.appraisal.valence<-0.05).length;
+  const strongest=felt.slice().sort((a,b)=>((b.effects||{}).effective_intensity||0)-((a.effects||{}).effective_intensity||0))[0];
+  $("#evStats").innerHTML = `<div class="stat"><b>${evs.length}</b><span>${hu?"esemény":"events"}</span></div>
+    <div class="stat"><b style="color:var(--good)">${pos}</b><span>${hu?"pozitív":"positive"}</span></div>
+    <div class="stat"><b style="color:var(--bad)">${neg}</b><span>${hu?"negatív":"negative"}</span></div>
+    <div class="stat"><b>${evs.filter(e=>(e.effects||{}).mundane).length}</b><span>${hu?"hétköznapi":"mundane"}</span></div>
+    ${strongest?`<div class="stat" style="flex:1;min-width:240px"><span>${hu?"legerősebb":"strongest"} · ${fmtT(strongest.t)} · ${pct(strongest.effects.effective_intensity)}%</span><div style="font-size:12.5px">${esc(strongest.appraisal.summary||strongest.kind)}</div></div>`:""}`;
+  const q=evFilter.q.toLowerCase();
+  const rows = evs.filter(e=>{
+    const ap=e.appraisal||{}, ef=e.effects||{};
+    if(evFilter.sources.size && !evFilter.sources.has(e.source)) return false;
+    if(evFilter.hideMundane && ef.mundane) return false;
+    if(evFilter.val==="pos" && !(ap.valence>0.05)) return false;
+    if(evFilter.val==="neg" && !(ap.valence<-0.05)) return false;
+    if(q && !`${ap.summary||""} ${e.kind} ${e.speaker||""} ${ap.target||""} ${ap.topic||""}`.toLowerCase().includes(q)) return false;
+    return true; }).slice(0,400);
+  if(!rows.length){ $("#events").innerHTML=`<tr><td class="empty">${t("noev")}</td></tr>`; return; }
+  $("#events").innerHTML = `<tr><th>${t("time")}</th><th>${t("event")}</th><th>${t("what")}</th><th>${t("eff")}</th><th>${t("felt")}</th><th></th></tr>` + rows.map(e=>{
+    const ap=e.appraisal||{}, ef=e.effects||{}, v=ap.valence;
+    const col = v===undefined? "var(--mute)" : v>0.05? "var(--good)" : v<-0.05? "var(--bad)" : "var(--mute)";
+    let felt = ef.emotions? Object.entries(ef.emotions).map(([k,x])=>`<span style="color:${emoCol(k)}" title="+${pct(x)}%">${emoName(k)}</span>`).join(" ") : "";
+    if(ef.mundane) felt=`<span class="tag">${t("mundane")}</span>`;
+    if(ef.leisure_paused) felt+=` <span class="tag warn">${hu?"szabadidő félretéve":"free time paused"}</span>`;
+    if(e.kind==="consolidation") felt=`<span class="tag">↺ ${ef.ruminated||0} / ♥ ${ef.savored||0} · ${hu?"nap mérlege":"day"} ${(ef.day_balance>=0?"+":"")+(ef.day_balance||0).toFixed(2)}</span>`;
+    let sum = e.kind==="consolidation"? (hu?"éjszakai feldolgozás":"nightly consolidation") : e.kind==="recall" ? "⟲ "+esc(ap.summary||"") : esc(ap.summary||"");
+    if(e.kind==="intent"||e.kind==="outreach") sum = `${esc(ef.kind||"")} → ${esc(ef.target||"")}`;
+    if(e.kind==="operator_edit") sum = `✎ ${hu?"kézi beállítás":"operator edit"}${e.speaker?" · "+esc(e.speaker):""}: `+Object.entries(ef.changed||{}).map(([k,v])=>`${esc(t(k))} ${(+v.from).toFixed(2)} → <b>${(+v.to).toFixed(2)}</b>`).join(", ");
+    if(e.kind==="leisure_end") sum = `${esc(ap.summary||"")} <span class="sub">(${(ef.enjoy>=0?"+":"")+(ef.enjoy||0).toFixed(2)})</span>`;
+    return `<tr><td class="num" style="text-align:left;white-space:nowrap">${fmtT(e.t)}</td>
+      <td><b style="color:${col}">${esc(e.kind)}</b><div class="sub">${esc(SRC_NAME()[e.source]||e.source||"")}${e.speaker?" · "+esc(e.speaker):""}</div></td>
+      <td>${sum}${ap.topic?` <span class="tag">${esc(ap.topic)}</span>`:""}</td>
+      <td class="num">${ef.effective_intensity!==undefined?pct(ef.effective_intensity)+"%":""}</td><td>${felt}</td>
+      <td>${ap.valence!==undefined && !["recall","leisure_start","leisure_end"].includes(e.kind)?`<button class="ghost small" onclick="recall(${e.id})" title="${hu?"az emlék gyengébben újra kiváltja az érzést":"re-triggers the feeling, weaker"}">${t("recall")}</button>`:""}</td></tr>`;}).join("");
+}
+$("#evSources").addEventListener("click",e=>{ const c=e.target.closest(".chip"); if(!c) return; const k=c.dataset.src; evFilter.sources.has(k)?evFilter.sources.delete(k):evFilter.sources.add(k); renderEvents(); });
+$("#evSearch").addEventListener("input",e=>{ evFilter.q=e.target.value; renderEvents(); });
+$("#evVal").addEventListener("change",e=>{ evFilter.val=e.target.value; renderEvents(); });
+$("#evMundane").addEventListener("change",e=>{ evFilter.hideMundane=e.target.checked; renderEvents(); });
+async function recall(id){ await api(`/api/agents/${agent}/recall/${id}`,{method:"POST"}); toast("⟲"); refresh(); }
+window.recall=recall;
+
+// ---------- charts
+function setupCanvas(c){ c.style.height=c.getAttribute("height")+"px"; const r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1; c.width=Math.max(1,r.width*dpr); c.height=(+c.getAttribute("height"))*dpr; const g=c.getContext("2d"); g.scale(dpr,dpr); return [g,r.width,+c.getAttribute("height")]; }
+let chartGeom=null;
+function drawCharts(){
+  if(tab!=="overview") return;
+  const c=$("#chart"); const [g,W,H]=setupCanvas(c); g.clearRect(0,0,W,H); if(W<50) return;
+  const now=Date.now()/1000, t0=now-hours*3600, X=ts=>40+(ts-t0)/(now-t0)*(W-50), Y=v=>12+(1-(v+1)/2)*(H-34);
+  const bands=[[-1,-0.45,"#5b7cff12"],[-0.45,-0.07,"#5b7cff08"],[0.07,0.5,"#3ddc9708"],[0.5,1,"#3ddc9712"]];
+  for(const [a,b,col] of bands){ g.fillStyle=col; g.fillRect(40,Y(b),W-50,Y(a)-Y(b)); }
+  g.strokeStyle="rgba(255,255,255,.07)"; g.fillStyle="#7d8196"; g.font="11px Inter,system-ui"; g.lineWidth=1;
+  for(const v of [-1,-0.5,0,0.5,1]){ g.beginPath(); g.moveTo(40,Y(v)); g.lineTo(W-10,Y(v)); g.stroke(); g.fillText((v>0?"+":"")+v,6,Y(v)+4); }
+  const n=6; for(let i=0;i<=n;i++){ const ts=t0+(now-t0)*i/n; g.fillText(new Date(ts*1000).toLocaleString(HU()?"hu-HU":"en-GB",hours<=24?{hour:"2-digit",minute:"2-digit"}:{month:"2-digit",day:"2-digit"}), X(ts)-16, H-6); }
+  // leisure sessions as background spans
+  for(const e of ((state&&state.leisure&&state.leisure.log)||[])){ if(e.end<t0) continue; g.fillStyle="#e0a04018"; g.fillRect(X(Math.max(e.start,t0)),12,Math.max(2,X(e.end)-X(Math.max(e.start,t0))),H-34); }
+  for(const e of evs){ const v=(e.appraisal||{}).valence; if(v===undefined||e.t<t0) continue; const eff=(e.effects||{}).effective_intensity||0; if((e.effects||{}).mundane) continue;
+    g.strokeStyle = v>0? "#3ddc9755":"#ff4d6d55"; g.beginPath(); g.moveTo(X(e.t),Y(0)); g.lineTo(X(e.t),Y(0)-(v>0?1:-1)*eff*(H-34)/2*0.9); g.stroke(); }
+  const line=(get,col,w=2,dash=[])=>{ g.strokeStyle=col; g.lineWidth=w; g.setLineDash(dash); g.shadowColor=col; g.shadowBlur=w>1.5?8:0; g.beginPath(); let st=false;
+    for(const h of hist){ if(h.t<t0) continue; const x=X(h.t), y=Y(get(h)); st? g.lineTo(x,y):(g.moveTo(x,y),st=true);} g.stroke(); g.setLineDash([]); g.shadowBlur=0; };
+  line(h=>h.mood.d,"#b57bff",1.2); line(h=>h.mood.a,"#4cc3ff",1.2); line(h=>h.baseline.p,"#ffd23f",2,[6,4]); line(h=>h.mood.p,"#ff8f8f",2.4);
+  chartGeom={X,Y,t0,now,W,H};
+  const c2=$("#drivesChart"); const [g2,W2,H2]=setupCanvas(c2); g2.clearRect(0,0,W2,H2);
+  const Y2=v=>6+(1-v)*(H2-14);
+  g2.strokeStyle="#ffffff33"; g2.beginPath(); g2.moveTo(40,Y2(0.6)); g2.lineTo(W2-10,Y2(0.6)); g2.setLineDash([3,4]); g2.stroke(); g2.setLineDash([]);
+  g2.fillStyle="#7d8196"; g2.font="11px Inter,system-ui"; g2.fillText("60%",6,Y2(0.6)+4);
+  for(const [k,col] of [["social","#3ddc97"],["novelty","#4cc3ff"],["competence","#ffd23f"],["fatigue","#ff4d6d"],["sleepiness","#9a7bff"]]){
+    g2.strokeStyle=col; g2.lineWidth=1.5; g2.beginPath(); let st=false;
+    for(const h of hist){ if(h.t<t0||h.drives[k]===undefined) continue; const x=X(h.t), y=Y2(h.drives[k]); st? g2.lineTo(x,y):(g2.moveTo(x,y),st=true);} g2.stroke(); }
+}
+$("#chart").addEventListener("mousemove",ev=>{
+  if(!chartGeom||!hist.length) return; const r=ev.target.getBoundingClientRect(), x=ev.clientX-r.left;
+  const ts=chartGeom.t0+(x-40)/(chartGeom.W-50)*(chartGeom.now-chartGeom.t0);
+  let best=null; for(const h of hist){ if(!best||Math.abs(h.t-ts)<Math.abs(best.t-ts)) best=h; }
+  const near=evs.filter(e=>Math.abs(e.t-ts)<(chartGeom.now-chartGeom.t0)/150 && (e.appraisal||{}).summary).slice(0,3);
+  const tip=$("#tip"); tip.style.display="block"; tip.style.left=Math.min(ev.clientX+14,window.innerWidth-360)+"px"; tip.style.top=(ev.clientY+10)+"px";
+  tip.innerHTML=`<b>${fmtT(best.t)}</b> · ${esc(best.label)}<br>p ${best.mood.p.toFixed(2)} · a ${best.mood.a.toFixed(2)} · d ${best.mood.d.toFixed(2)} · ${HU()?"háttér":"base"} ${best.baseline.p.toFixed(2)}`+
+    (best.emotions||[]).slice(0,3).map(e=>`<br><span style="color:${emoCol(e.name)}">${emoName(e.name)}${e.target?" → "+esc(e.target):""} ${pct(e.i)}%</span>`).join("")+
+    near.map(e=>`<br><span class="sub">• ${esc(e.appraisal.summary)}</span>`).join("");
+});
+$("#chart").addEventListener("mouseleave",()=>$("#tip").style.display="none");
+
+// ---------- settings (temperament form)
+const TGROUPS = [
+ ["Személyiség|Persona",["name","description","likes","dislikes","humor","expressiveness"]],
+ ["Reaktivitás|Reactivity",["reactivity","fiction_gain","positive_sensitivity","negative_sensitivity","emotion_gain","jolt","mundane_threshold","mundane_recovery"]],
+ ["Időállandók|Time constants",["recovery","peak_fade","mood_tau_h","baseline_tau_d","resilience_tau_d"]],
+ ["Háttérhangulat|Background",["set_point","baseline_min","baseline_max","crisis_floor","rumination","savoring","day_balance_gain","day_balance_scale"]],
+ ["Torzítások|Biases",["mood_congruence","habituation_strength","habituation_half_life_h","negative_habituation"]],
+ ["Szükségletek|Needs",["social_need","novelty_need","competence_need","recognition_need","need_threshold","need_feeling_max","need_adaptation_d","dormant_after_h"]],
+ ["Fáradtság és alvás|Fatigue & sleep",["fatigue_per_effort","fatigue_recovery_h","social_fatigue","passive_fatigue","flow_relief","tired_negativity","circadian_strength","sleep_hours"]],
+ ["Kötődés|Attachment",["longing_delay_h","longing_rate","longing_feel_threshold","sulkiness","reunion_joy"]],
+ ["Beszélgetés|Conversation",["interest_gain","thread_gap_min","engagement_half_life_h","steer_threshold"]],
+ ["Romantika és vágy|Romance & desire",["romance_enabled","adult_enabled","intimacy_need","libido_rate","desire_gain","rebuff_cooldown_h","libido_feel_threshold","libido_feel_max","libido_unmet_after_h","openness_learn_rate","openness_unlearn","openness_half_life_d","openness_libido_gain","openness_point","openness_attraction_gain","heat_threshold","taboo_thrill","afterglow_shame","romance_private_only"]],
+ ["Önállóság|Autonomy",["autonomy_enabled","quiet_hours","outreach_threshold","outreach_cooldown_h","outreach_backoff","max_unanswered","max_outreach_per_day","check_in_after_min","check_in_window_h","check_in_min_engagement","intent_ttl_h","answer_window_h","webhook_url"]],
+ ["Szabadidő|Free time",["leisure_enabled","leisure_activities","leisure_prior","leisure_urge_min","leisure_eagerness","leisure_nothing_weight","leisure_randomness","leisure_idle_min","leisure_idle_tau_h","leisure_gap_min","leisure_max_per_day","leisure_max_minutes","leisure_restores","leisure_satiety","leisure_satiety_h","leisure_taste_rate","leisure_resume_bonus","journal_relief"]],
+];
+const THELP = {name:"név",description:"rövid leírás az értékelőnek",likes:"amit szeret (lista)",dislikes:"amit nem szeret",humor:"amin nevet",expressiveness:"0 visszafogott … 1 nyíltan kimutatja",
+ reactivity:"minden esemény szorzója",fiction_gain:"történetek ereje a saját élethez képest",emotion_gain:"az érzések mennyire húzzák a hangulatot",recovery:">1: gyorsabban csillapodnak az érzések",
+ mood_tau_h:"hangulat késése (óra)",baseline_tau_d:"háttér követése (nap)",resilience_tau_d:"visszatérés az alapponthoz (nap)",set_point:"temperamentum alappontja (p/a/d)",
+ crisis_floor:"e alatt riasztás",mood_congruence:"rossz kedvben a rossz hír nagyobb",habituation_strength:"megszokás erőssége",negative_habituation:"negatívhoz lassabban szokik",
+ need_threshold:"e felett érzés lesz a hiányból",dormant_after_h:"ennyi óra csend után „alszik”",longing_delay_h:"ennyi óra után kezd hiányozni",outreach_threshold:"ennyi hiányérzetnél ír magától",
+ quiet_hours:"[kezdő, záró] óra",leisure_urge_min:"nyugtalansági küszöb",leisure_eagerness:"indulási esély percenként teljes nyugtalanságnál",leisure_nothing_weight:"a „semmit se csinálok” súlya",
+ leisure_idle_min:"ennyi perc csend kell beszélgetés után",leisure_idle_tau_h:"az üres órák nyugtalanságának léptéke",leisure_gap_min:"szünet két alkalom között (perc)",
+ leisure_satiety:"ismétlés miatti eltelés",leisure_taste_rate:"egy alkalom mennyit mozdít az ízlésen",journal_relief:"naplóírás mennyit old a rossz érzéseken",libido_feel_threshold:"e felett a libidó magától vággyá válik a kötődött, hozzájárult partner felé",libido_feel_max:"a magától keletkező vágy felső határa",
+ openness_learn_rate:"egy jó intim pillanat mennyit tanít",openness_unlearn:"a határ utáni nyomás ennyiszer erősebben tanít vissza",openness_half_life_d:"nyitottság felezési ideje (nap)",
+ openness_libido_gain:"nyitottan ennyivel gyorsabban töltődik a libidó",openness_point:"e felett alacsony libidónál is vágyik a közelségre",openness_attraction_gain:"nyitottan ennyivel gyorsabban nő a vonzalom",
+ libido_unmet_after_h:"ennyi óra kielégítetlen vágy után enyhe nyugtalanság",leisure_restores:"élvezetes szabadidő lépésenként ennyit pihentet a munka/beszélgetés fáradtságán",
+ fatigue_per_effort:"egy esemény alapköltsége",fatigue_recovery_h:"kimerültség felezési ideje (óra)",social_fatigue:"kellemes beszélgetés a munkához képest",
+ passive_fatigue:"ami csak történik vele (olvasás, hír) a munkához képest",flow_relief:"ami leköti, ennyivel kevésbé fáraszt",tired_negativity:"fáradtan ennyivel nagyobbat üt a rossz",
+ circadian_strength:"álmosság erőssége (0 = nincs napszak)",sleep_hours:"[lefekvés, ébredés] óra"};
+function renderTempForm(){
+  if(!temp) return; const hu=HU(); const used=new Set();
+  const field=k=>{ used.add(k); const v=temp[k]; const help=hu&&THELP[k]?`<small>${THELP[k]}</small>`:"";
+    if(typeof v==="boolean") return `<label><span>${k}${help}</span><input type="checkbox" data-k="${k}" data-type="bool" ${v?"checked":""}></label>`;
+    if(typeof v==="number") return `<label><span>${k}${help}</span><input type="number" step="any" data-k="${k}" data-type="num" value="${v}"></label>`;
+    if(typeof v==="string") return `<label class="${v.length>30||k==="description"?"wide":""}"><span>${k}${help}</span><input data-k="${k}" data-type="str" value="${esc(v)}"></label>`;
+    return `<label class="wide"><span>${k}${help}</span><input data-k="${k}" data-type="json" value="${esc(JSON.stringify(v))}"></label>`; };
+  let html="";
+  for(const [title,keys] of TGROUPS){ const ks=keys.filter(k=>k in temp); if(!ks.length) continue;
+    html+=`<h3 style="margin:16px 0 6px">${title.split("|")[hu?0:1]}</h3><div class="form">${ks.map(field).join("")}</div>`; }
+  const rest=Object.keys(temp).filter(k=>!used.has(k));
+  if(rest.length) html+=`<h3 style="margin:16px 0 6px">${hu?"Egyéb":"Other"}</h3><div class="form">${rest.map(field).join("")}</div>`;
+  $("#tempForm").innerHTML=html; $("#temp").value=JSON.stringify(temp,null,2); $("#tempDirty").textContent="";
+}
+$("#tempForm").addEventListener("input",()=>$("#tempDirty").textContent=t("unsaved"));
+function collectTemp(){ const out={};
+  document.querySelectorAll("#tempForm [data-k]").forEach(i=>{ const k=i.dataset.k, ty=i.dataset.type;
+    if(ty==="bool") out[k]=i.checked; else if(ty==="num") out[k]=+i.value; else if(ty==="str") out[k]=i.value; else out[k]=JSON.parse(i.value); }); return out; }
+async function saveTemp(d){ await api(`/api/agents/${agent}/temperament`,{method:"PUT",body:JSON.stringify(d)}); toast(HU()?"✓ mentve":"✓ saved"); await loadTemp(); refresh(false); }
+$("#tempBtn").onclick=async()=>{ try{ await saveTemp(collectTemp()); }catch(e){ toast("error: "+e.message);} };
+$("#tempRawBtn").onclick=async()=>{ try{ await saveTemp(JSON.parse($("#temp").value)); }catch(e){ toast("error: "+e.message);} };
+
+// ---------------------------------------------------------------- data
+async function loadAgents(){
+  const list=await api("/api/agents"); const sel=$("#agent"); const saved=localStorage.getItem("limbic.agent");
+  sel.innerHTML=list.map(a=>`<option value="${esc(a.id)}">${esc(a.id)}${a.alerts.length?" ⚠":""}${a.pending_intents?" ✉":""}</option>`).join("");
+  agent = list.find(a=>a.id===(agent||saved)) ? (agent||saved) : (list[0]||{}).id; if(agent) sel.value=agent;
+}
+async function loadTemp(){ if(!agent) return; temp=await api(`/api/agents/${agent}/temperament`); renderTempForm(); }
+async function refresh(full=true){
+  if(!agent) return;
+  try{
+    const [s,h,e,p]=await Promise.all([api(`/api/agents/${agent}/state`), full?api(`/api/agents/${agent}/history?hours=${hours}&points=700`):null,
+      full?api(`/api/agents/${agent}/events?hours=${hours}&limit=600`):null,
+      tab==="feelings"? api(`/api/agents/${agent}/prompt?lang=${$("#pLang").value}&interlocutor=${encodeURIComponent($("#pWho").value)}`):null]);
+    state=s; if(h) hist=h; if(e) evs=e; if(p) $("#prompt").textContent=p.prompt;
+    const who=$("#pWho"), cur=who.value, ppl=Object.entries(s.relationships).filter(([n,r])=>r.is_person).map(([n])=>n);
+    who.innerHTML=`<option value="">—</option>`+ppl.map(n=>`<option ${n===cur?"selected":""}>${esc(n)}</option>`).join("");
+    $("#updated").textContent=`${t("updated")} ${new Date().toLocaleTimeString(HU()?"hu-HU":"en-GB")}`;
+    render();
+  }catch(err){ $("#updated").textContent="⚠ "+err.message; }
+}
+
+// ---------------------------------------------------------------- controls
+$("#ranges").innerHTML=RANGES.map(([l,h])=>`<button class="ghost small ${h===hours?"on":""}" data-h="${h}">${l}</button>`).join("");
+$("#ranges").addEventListener("click",e=>{ const h=e.target.dataset.h; if(!h) return; hours=+h; localStorage.setItem("limbic.hours",h);
+  document.querySelectorAll("#ranges button").forEach(b=>b.classList.toggle("on",+b.dataset.h===hours)); refresh(); });
+$("#agent").addEventListener("change",async e=>{ agent=e.target.value; localStorage.setItem("limbic.agent",agent); evFilter.sources.clear(); await loadTemp(); refresh(); });
+$("#langBtn").onclick=()=>{ lang= HU()?"en":"hu"; localStorage.setItem("limbic.lang",lang); $("#pLang").value=lang; applyI18n(); renderTempForm(); loadAgents(); refresh(); };
+$("#autoBtn").onclick=()=>{ auto=!auto; localStorage.setItem("limbic.auto",auto?"1":"0"); applyI18n(); };
+$("#pLang").onchange=()=>refresh(false); $("#pWho").onchange=()=>refresh(false);
+$("#observeBtn").onclick=async()=>{ const text=$("#text").value.trim(); if(!text) return;
+  const r=await api(`/api/agents/${agent}/observe`,{method:"POST",body:JSON.stringify({text,speaker:$("#speaker").value||null,private:$("#o_private").checked})});
+  toast(r.results.map(x=>x.appraisal.event+" → "+(Object.keys(x.effects.emotions).map(emoName).join(", ")||(x.effects.mundane?t("mundane"):"–"))).join(" | ")+(r.appraiser_error?" (fallback)":"")); $("#text").value=""; refresh(); };
+$("#text").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#observeBtn").click(); });
+const SL=[["valence",-1,1,0.6],["intensity",0,1,0.5],["relevance",0,1,0.5],["humor",0,1,0],["novelty",0,1,0.3],["affinity",-1,1,0],["effort",0,1,0],["competence",-1,1,0],["romance",0,1,0],["erotic",0,1,0],["fulfilment",0,1,0]];
+$("#sliders").innerHTML=SL.map(([k,a,b,v])=>`<label class="s">${k}<input type="range" id="m_${k}" min="${a}" max="${b}" step="0.05" value="${v}" oninput="this.nextElementSibling.textContent=(+this.value).toFixed(2)"><span class="num">${(+v).toFixed(2)}</span></label>`).join("");
+$("#feelBtn").onclick=async()=>{ const ap={event:$("#m_event").value||"event",summary:$("#m_summary").value,target:$("#m_target").value||null,agency:$("#m_agency").value,
+   prospective:$("#m_prospective").checked,loss:$("#m_loss").checked,blocked:$("#m_blocked").checked,rebuff:$("#m_rebuff").checked,topic:$("#m_topic").value||null};
+  for(const [k] of SL) ap[k]=+$("#m_"+k).value;
+  const r=await api(`/api/agents/${agent}/events`,{method:"POST",body:JSON.stringify({appraisal:ap,source:"dashboard",speaker:ap.target,private:$("#m_private").checked})});
+  toast(Object.keys(r.results[0].effects.emotions).map(emoName).join(", ")||t("mundane")); refresh(); };
+$("#evalBtn").onclick=async()=>{ const r=await api(`/api/agents/${agent}/intents/evaluate`,{method:"POST"}); toast(r.length? r.map(i=>i.kind+" → "+i.target).join(", ") : "–"); refresh(); };
+$("#tickBtn").onclick=async()=>{ await api(`/api/agents/${agent}/tick`,{method:"POST"}); refresh(); };
+$("#consBtn").onclick=async()=>{ const r=await api(`/api/agents/${agent}/consolidate`,{method:"POST",body:"{}"}); toast(`↺ ${r.ruminated} · ♥ ${r.savored}`); refresh(); };
+$("#resetBtn").onclick=async()=>{ if(!confirm(t("confirm_reset"))) return; await api(`/api/agents/${agent}/reset`,{method:"POST"}); refresh(); };
+window.addEventListener("resize",drawCharts);
+window.addEventListener("hashchange",()=>{ const h=location.hash.slice(1); if(TABS.includes(h)){ tab=h; buildTabs(); render(); } });
+
+// ---------------------------------------------------------------- self-update
+const UT=k=>({
+ check:["Frissítés keresése","Check for updates"], checking:["Keresés…","Checking…"], uptodate:["Naprakész","Up to date"],
+ avail:n=>[`${n} új változás`,`${n} new change${n>1?"s":""}`], open:["Megnézem","Review"], title:["Új verzió érhető el","An update is available"],
+ sub:(b,u)=>[`A GitHubon ${b} új változás van (${u}). A frissítés lehúzza őket, elmenti az adatbázist, és újraindítja a limbicet — kb. 5 másodperc.`,`${b} new change${b>1?"s":""} on ${u}. Updating pulls them, backs up the database and restarts limbic — about 5 seconds.`],
+ go:["Frissítés most","Update now"], close:["Mégse","Cancel"], done:["Kész","Done"],
+ s1:["Változások letöltése…","Pulling changes…"], s2:["Újraindulás…","Restarting…"], s3:["Kész, újratöltöm az oldalt.","Done, reloading the page."],
+ integration:["A contrib/ alatti integráció megváltozott. Frissítsd a használt adaptert az útmutatója szerint.","An optional integration under contrib/ changed. Update the adapter you use according to its guide."],
+ blocked:["Most nem frissíthető:","Cannot update right now:"],
+ dirty:["Helyben módosított fájlok vannak — ezeket a frissítés nem írja felül. Commitold vagy állítsd vissza őket (<code>git stash</code>).","There are local edits — the update will not overwrite them. Commit or stash them (<code>git stash</code>)."],
+ ahead:["Ezen a gépen olyan commitok vannak, amik a GitHubon nincsenek — kézzel kell összefésülni (<code>git pull</code>).","This checkout has commits that are not on the remote — merge by hand (<code>git pull</code>)."],
+ nogit:["Nem git-ből fut (pl. pip-pel telepítve), ezért itt nem frissíthető. Frissítés: <code>pip install -U …</code>","Not running from a git checkout (installed with pip?), so it cannot self-update here."],
+ off:["Az önfrissítés ki van kapcsolva (LIMBIC_SELF_UPDATE=0).","Self-update is disabled (LIMBIC_SELF_UPDATE=0)."],
+ fail:["Nem sikerült:","Failed:"], slow:["A szerver nem jött vissza 60 mp alatt. Nézd meg: systemctl status limbic","The server did not come back within 60 s. Check: systemctl status limbic"],
+ fetchErr:["A GitHub most nem érhető el:","GitHub is unreachable right now:"], last:["utolsó ellenőrzés","checked"]
+}[k]);
+const ut=(k,...a)=>{ const v=UT(k); const r=typeof v==="function"? v(...a): v; return r[HU()?0:1]; };
+let upd=null, updBusy=false;
+async function checkUpdate(fetchRemote=true){
+  if(updBusy) return; updBusy=true; $("#updBtn").innerHTML=`<span class="spin">⟳</span> <span class="lbl">${ut("checking")}</span>`;
+  try{ upd=await api("/api/update?fetch="+(fetchRemote?1:0)); }catch(e){ upd={supported:false,reason:e.message}; }
+  updBusy=false; renderUpd();
+}
+function renderUpd(){
+  const u=upd||{}, box=$("#upd"), btn=$("#updBtn");
+  $("#updVer").textContent=u.version||"–"; $("#updHead").innerHTML=u.head?`<code>${esc(u.head)}</code>`:"";
+  box.classList.toggle("has",!!(u.behind>0));
+  if(!u.supported){ $("#updMsg").textContent=u.reason?((u.reason+"").includes("git checkout")?(HU()?"nem git-ből fut":"not a git checkout"):u.reason):""; btn.innerHTML=`⟳ <span class="lbl">${ut("check")}</span>`; btn.className="small"; return; }
+  if(u.behind>0){ $("#updMsg").textContent=ut("avail",u.behind); btn.innerHTML=`↓ <span class="lbl">${ut("open")}</span>`; btn.className="small primary"; }
+  else { $("#updMsg").textContent=(u.fetch_error? "⚠ offline" : ut("uptodate"))+(u.checked?` · ${ago(Date.now()/1000-u.checked)}`:""); btn.innerHTML=`⟳ <span class="lbl">${ut("check")}</span>`; btn.className="small"; }
+}
+function openUpd(){
+  const u=upd||{}, m=$("#updModal"); m.classList.add("on"); $("#umSteps").style.display="none";
+  $("#umTitle").textContent=ut("title"); $("#umSub").textContent=ut("sub",u.behind,u.upstream||"origin");
+  let body=`<div>${(u.incoming||[]).map(c=>`<div class="commit"><code>${esc(c.hash)}</code><span>${esc(c.subject)}</span><span class="sub">${ago(Date.now()/1000-c.time)}</span></div>`).join("")}</div>`;
+  if(u.integration_changed) body+=`<div class="why" style="margin-top:14px">${ut("integration")}</div>`;
+  const why = !u.enabled? ut("off") : (u.dirty&&u.dirty.length)? ut("dirty")+`<pre style="margin-top:8px">${u.dirty.map(esc).join("\n")}</pre>` : u.ahead? ut("ahead") : "";
+  if(why) body+=`<div class="warnbox" style="margin-top:14px"><b>${ut("blocked")}</b> ${why}</div>`;
+  $("#umBody").innerHTML=body; $("#umClose").textContent=ut("close");
+  const go=$("#umGo"); go.textContent=ut("go"); go.disabled=!u.can_update; go.style.display="";
+}
+async function doUpdate(){
+  const go=$("#umGo"), steps=$("#umSteps").children; go.disabled=true; $("#umClose").disabled=true; $("#umSteps").style.display="flex";
+  const st=(i,cls)=>{ for(let j=0;j<3;j++) steps[j].className = j<i?"on": j===i? cls: ""; };
+  st(0,"run"); $("#umSub").textContent=ut("s1");
+  let before=null; try{ before=(await api("/api/health")).started; }catch(e){}
+  let r; try{ r=await api("/api/update/apply",{method:"POST",body:"{}"}); }
+  catch(e){ $("#umSub").textContent=ut("fail")+" "+e.message; $("#umClose").disabled=false; st(0,""); return; }
+  if(!r.updated){ $("#umSub").textContent=ut("uptodate"); $("#umClose").disabled=false; st(3); return; }
+  st(1,"run"); $("#umSub").textContent=ut("s2")+` ${r.from} → ${r.to}`;
+  for(let i=0;i<60;i++){ await new Promise(z=>setTimeout(z,1000));
+    try{ const hh=await fetch("/api/health",{cache:"no-store"}).then(x=>x.json()); if(hh.started && hh.started!==before){
+      st(3); $("#umSub").textContent=ut("s3"); setTimeout(()=>location.reload(),900); return; } }catch(e){}
+  }
+  $("#umSub").textContent=ut("slow"); $("#umClose").disabled=false;
+}
+$("#updBtn").onclick=()=>{ if(upd&&upd.behind>0) openUpd(); else checkUpdate(true); };
+$("#umClose").onclick=()=>$("#updModal").classList.remove("on");
+$("#umGo").onclick=doUpdate;
+$("#updModal").addEventListener("click",e=>{ if(e.target.id==="updModal" && !$("#umClose").disabled) $("#updModal").classList.remove("on"); });
+$("#nowBtn").onclick=()=>{ $("#nowBtn").innerHTML='<span class="spin">↻</span>'; refresh(true).finally(()=>$("#nowBtn").textContent="↻"); };
+document.addEventListener("keydown",e=>{
+  if(e.target.matches("input,textarea,select")||e.ctrlKey||e.metaKey||e.altKey) { if(e.key==="Escape") e.target.blur(); return; }
+  if(e.key==="Escape"){ $("#updModal").classList.remove("on"); return; }
+  const n=+e.key; if(n>=1&&n<=TABS.length){ tab=TABS[n-1]; localStorage.setItem("limbic.tab",tab); history.replaceState(null,"","#"+tab); buildTabs(); render(); return; }
+  if(e.key==="r"||e.key==="R"){ $("#nowBtn").click(); return; }
+  if(e.key==="/"){ e.preventDefault(); tab="memory"; buildTabs(); render(); setTimeout(()=>$("#evSearch").focus(),50); }
+});
+setInterval(()=>{ if(!document.hidden) checkUpdate(true); }, 30*60*1000);
+
+(async()=>{ if(!TABS.includes(tab)) tab="overview"; $("#pLang").value=lang; applyI18n(); await loadAgents(); await loadTemp(); buildTabs(); await refresh(); checkUpdate(true);
+  setInterval(()=>{ if(auto && !document.hidden) refresh(true); },10000); })();
+</script>
+</body>
+</html>

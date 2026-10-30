@@ -1,0 +1,16 @@
+name: Question / help with setup
+description: Stuck installing or not sure how something works
+labels: [question]
+body:
+  - type: textarea
+    id: q
+    attributes:
+      label: Your question
+      description: Which step of docs/HERMES.md are you at, and what did you try? (No tokens or API keys, please.)
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, agent framework/integration (if any), appraiser model
