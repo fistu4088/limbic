@@ -5,12 +5,17 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 
 from limbic import installer
 from limbic.installer import build_config, default_install_dir, normalize_appraiser_url, write_installation
 
 
 class InstallerTests(unittest.TestCase):
+    def test_generated_launcher_runs_server_in_its_tracked_process(self):
+        self.assertIn("from limbic.cli import main", installer.LAUNCHER)
+        self.assertNotIn("os.execvpe", installer.LAUNCHER)
+
     def test_normalize_appraiser_url_accepts_base_or_completion_endpoint(self):
         self.assertEqual(normalize_appraiser_url("https://api.example/v1/"), "https://api.example/v1")
         self.assertEqual(normalize_appraiser_url("https://api.example/v1/chat/completions"),
@@ -62,7 +67,10 @@ class InstallerTests(unittest.TestCase):
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
             cfg = build_config("127.0.0.1", 8770, "aria", "")
-            installer.create_agent(f"http://127.0.0.1:{server.server_port}", cfg)
+            with patch.dict(os.environ, {
+                    "HTTP_PROXY": "http://127.0.0.1:1", "http_proxy": "http://127.0.0.1:1",
+                    "NO_PROXY": "", "no_proxy": ""}):
+                installer.create_agent(f"http://127.0.0.1:{server.server_port}", cfg)
         finally:
             server.shutdown()
             server.server_close()

@@ -27,7 +27,7 @@ PROVIDERS = {
 }
 
 
-LAUNCHER = '''"""Start the locally installed limbic server."""
+LAUNCHER = '''"""Start the locally installed limbic server in this tracked process."""
 import json
 import os
 import sys
@@ -35,11 +35,11 @@ from pathlib import Path
 
 home = Path(__file__).resolve().parent
 config = json.loads((home / "data" / "limbic-install.json").read_text(encoding="utf-8"))
-env = os.environ.copy()
-env.update(config["env"])
-cmd = [sys.executable, "-m", "limbic", "serve", "--db", config["db"],
-       "--host", config["host"], "--port", str(config["port"])]
-os.execvpe(sys.executable, [sys.executable, *cmd[1:]], env)
+os.environ.update(config["env"])
+sys.argv = ["limbic", "serve", "--db", config["db"],
+            "--host", config["host"], "--port", str(config["port"])]
+from limbic.cli import main
+raise SystemExit(main())
 '''
 
 
@@ -148,6 +148,12 @@ def _appraiser(input_fn=input, secret_fn=getpass.getpass) -> tuple[str, str, str
     return url, model, key
 
 
+def _open_local(url_or_request, timeout: float):
+    """Call the local server directly; system HTTP proxies must not intercept loopback."""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    return opener.open(url_or_request, timeout=timeout)
+
+
 def create_agent(base_url: str, config: dict) -> dict:
     """Create the configured agent through the authenticated local API."""
     payload = {"id": config["agent_id"],
@@ -156,7 +162,7 @@ def create_agent(base_url: str, config: dict) -> dict:
         base_url.rstrip("/") + "/api/agents", data=json.dumps(payload).encode("utf-8"),
         headers={"Authorization": f"Bearer {config['env']['LIMBIC_TOKEN']}",
                  "Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=5) as response:
+    with _open_local(req, timeout=5) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -188,7 +194,7 @@ def _start_server(target: Path, config: dict) -> tuple[subprocess.Popen | None, 
         if process.poll() is not None:
             return None, url
         try:
-            with urllib.request.urlopen(url + "/api/health", timeout=0.5) as response:
+            with _open_local(url + "/api/health", timeout=0.5) as response:
                 if response.status == 200:
                     return process, url
         except (OSError, urllib.error.URLError):
