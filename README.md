@@ -15,6 +15,22 @@ thinking, tone and behaviour.
 
 **→ Installation guide: [`docs/INSTALLATION.md`](docs/INSTALLATION.md)** — step by step for Linux and Windows, from cloning the repository to a running server and first agent. This is a standalone project; Hermes is one optional adapter, documented separately in [`docs/HERMES.md`](docs/HERMES.md).
 
+### Interactive installer (Python 3.10+ and Git)
+
+Linux:
+
+```bash
+tmp=$(mktemp) && { curl -fsSL https://raw.githubusercontent.com/fistu4088/limbic/main/install.sh -o "$tmp" && bash "$tmp"; status=$?; rm -f "$tmp"; test "$status" -eq 0; }
+```
+
+Windows PowerShell (Git is optional; without it the installer downloads a source archive):
+
+```powershell
+irm https://raw.githubusercontent.com/fistu4088/limbic/main/install.ps1 | iex
+```
+
+The console wizard asks for an install location, agent ID, optional appraiser API/model and whether to start the server. It creates a private API token, installs to your user directory, creates the first agent and opens the dashboard. The server binds to `127.0.0.1` by default. Review the script before running it if you prefer to inspect downloaded code first.
+
 ## Why not just "tell the LLM it is sad"?
 
 Because then it is sad in one reply and fine in the next, inflates every

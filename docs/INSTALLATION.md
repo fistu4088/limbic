@@ -7,9 +7,33 @@ This guide takes you from a clean machine to a running dashboard and API. It cov
 ## What you need
 
 - Python 3.10 or newer (`python --version` / `python3 --version`)
-- Git
+- Git for the Linux one-line installer and manual clone. The Windows installer can use Git or download a source archive.
 - For meaningful appraisals: an OpenAI-compatible chat-completions endpoint, either hosted or local. The API endpoint is optional for a basic demo; without it, limbic uses its simple keyword fallback.
 - No `requirements.txt`: there are no third-party runtime packages to install.
+
+## Quick interactive install
+
+The installer works without administrator access and asks each question when it reaches that step. It installs a copy under your user account; it does not overwrite a non-empty target directory.
+
+### Linux
+
+```bash
+tmp=$(mktemp) && { curl -fsSL https://raw.githubusercontent.com/fistu4088/limbic/main/install.sh -o "$tmp" && bash "$tmp"; status=$?; rm -f "$tmp"; test "$status" -eq 0; }
+```
+
+### Windows PowerShell
+
+```powershell
+irm https://raw.githubusercontent.com/fistu4088/limbic/main/install.ps1 | iex
+```
+
+The wizard asks for the install directory, bind address and port, agent ID and display name, then offers three appraiser choices: skip (use the built-in fallback), configure a hosted API, or configure a local OpenAI-compatible server. Hosted API keys are entered with hidden input. The default bind address is `127.0.0.1`, so the dashboard is only accessible from that computer. The wizard warns and asks for confirmation before using another address: dashboard and read-only API requests are not authenticated, so only bind to a trusted, firewalled network.
+
+When prompted, choosing to start the server creates the agent through the authenticated API, starts the dashboard and opens it in a browser. The generated write token and optional appraiser key are stored in `data/limbic-install.json` inside the install directory. On Linux/macOS the installer restricts the data directory to the current user (`0700`) and the settings file to `0600`; Windows uses the current user's normal directory permissions. Do not share that file or paste its contents into issue reports.
+
+The server log and SQLite database are in the install directory's `data/` folder. The wizard prints the process ID and a stop command. To start it later, run `python3 <install-directory>/start-limbic.py` on Linux or `py -3 <install-directory>\\start-limbic.py` in PowerShell. You can remove the installation by stopping the server and deleting that install directory; this also deletes its database and token.
+
+To inspect the scripts before running them, download `install.sh` / `install.ps1` from the repository and read them first, then invoke the local file. The Linux script uses Git; the PowerShell script falls back to the GitHub source archive.
 
 ## 1. Download and verify
 
