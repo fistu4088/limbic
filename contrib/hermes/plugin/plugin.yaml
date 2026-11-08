@@ -1,5 +1,5 @@
 name: limbic
-version: "0.10.0"
+version: "0.10.1"
 manifest_version: 2
 description: "limbic emotion system — gives this profile feelings, needs and autonomy. Injects the inner state before each turn, appraises the exchange afterwards, and lets the agent message people on its own (Telegram, Discord, Desktop) when it wants to."
 author: limbic contributors

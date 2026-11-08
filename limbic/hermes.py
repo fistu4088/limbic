@@ -269,3 +269,22 @@ def temperament_for(profile: dict, name: str | None = None, description: str | N
     if d:
         t["description"] = d.strip()[:400]
     return t
+
+
+def disconnect_profile(home: Path, cli: str | None = None) -> tuple[bool, list[str]]:
+    """Disable the plugin in one profile (config backed up first; plugin files stay)."""
+    home = Path(home)
+    log = []
+    cfg = home / "config.yaml"
+    if cfg.is_file():
+        import time
+        bak = home / f"config.yaml.bak-limbic-{time.strftime('%Y%m%d-%H%M%S')}"
+        shutil.copy2(cfg, bak)
+        log.append(f"backup -> {bak}")
+    cli = cli or hermes_cli()
+    if not cli:
+        return False, log + [f"hermes command not found; run with HERMES_HOME={home}: hermes plugins disable limbic"]
+    rc, out = _run([cli, "plugins", "disable", "limbic"], home=home, timeout=240)
+    ok = rc == 0 or "already disabled" in out or "not enabled" in out
+    log.append("plugin disabled" if ok else f"failed: {out.strip()[-300:]}")
+    return ok, log

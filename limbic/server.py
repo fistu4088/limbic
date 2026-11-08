@@ -242,6 +242,16 @@ def make_handler(hub: Hub, token: str | None):
                     if ok and body.get("restart"):
                         out["restart"] = hermes.restart_gateway(Path(prof["home"]))
                 return self._send(201 if created else 200, out)
+            if method == "POST" and len(p) == 3 and p[0] == "profiles" and p[2] == "disconnect":
+                prof = next((x for x in hermes.list_profiles(root) if x["id"] == p[1]), None)
+                if prof is None:
+                    return self._send(404, {"error": f"no Hermes profile {p[1]}"})
+                if not prof["plugin_enabled"]:
+                    return self._send(200, {"plugin": False, "log": ["plugin was not enabled"]})
+                ok, lines = hermes.disconnect_profile(Path(prof["home"]))
+                if ok and body.get("restart"):
+                    hermes.restart_gateway(Path(prof["home"]))
+                return self._send(200 if ok else 500, {"plugin": not ok, "log": lines})
             return self._send(404, {"error": "not found"})
 
         def _api(self, method: str, p: list[str], q: dict) -> None:

@@ -6,6 +6,6 @@ from .engine import Engine, State
 from .store import Store
 from .temperament import Temperament
 
-__version__ = "0.10.0"
+__version__ = "0.10.1"
 __all__ = ["Limbic", "Appraisal", "KeywordAppraiser", "LLMAppraiser", "map_emotions",
            "EMOTIONS", "Engine", "State", "Store", "Temperament", "__version__"]

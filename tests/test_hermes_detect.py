@@ -149,6 +149,22 @@ class Endpoints(unittest.TestCase):
         self.assertIn("10.0.0.9", cfg.read_text())
         self.assertFalse((self.root / "profiles" / "aria" / "plugins").exists())
 
+    def test_disconnect_skips_profile_without_plugin(self):
+        code, d = self.call("POST", "/api/hermes/profiles/default/disconnect", {})
+        self.assertEqual((code, d["plugin"]), (200, False))
+
+    @unittest.skipIf(os.name == "nt", "shell stub")
+    def test_disconnect_disables_plugin_via_cli(self):
+        calls = self.tmp / "calls.txt"
+        stub = self.tmp / "hermes"
+        stub.write_text(f"#!{sys.executable}\nimport os,sys\nopen({str(calls)!r},'a').write(os.environ['HERMES_HOME']+'|'+' '.join(sys.argv[1:])+'\\n')\n")
+        stub.chmod(stub.stat().st_mode | stat.S_IEXEC)
+        with mock.patch.object(hermes, "hermes_cli", return_value=str(stub)):
+            code, d = self.call("POST", "/api/hermes/profiles/aria/disconnect", {})
+        self.assertEqual((code, d["plugin"]), (200, False))
+        self.assertIn("plugins disable limbic", calls.read_text())
+        self.assertTrue(list((self.root / "profiles" / "aria").glob("config.yaml.bak-limbic-*")))
+
     def test_unknown_profile_404(self):
         with self.assertRaises(urllib.error.HTTPError) as cm:
             self.call("POST", "/api/hermes/profiles/nope/connect", {})

@@ -217,7 +217,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:12.5px}
       <path d="M10 15c2.2-3 4-3 6 0s3.8 3 6 0" fill="none" stroke="url(#lg)" stroke-width="2" stroke-linecap="round"/></svg>
     <div><b>limbic</b><small>inner life monitor</small></div>
   </div>
-  <div class="who"><div class="dot" id="whoDot"></div><div style="min-width:0;flex:1"><select id="agent" title="agent"></select><span class="sub" id="whoSub"></span></div></div>
+  <div class="who"><div class="dot" id="whoDot"></div><div style="min-width:0;flex:1"><div style="display:flex;gap:4px;align-items:center"><select id="agent" title="agent" style="flex:1;min-width:0"></select><button class="ghost small" id="agentAdd" title="Hermes profil felvétele / add Hermes profile" style="padding:2px 9px">+</button><button class="ghost small" id="agentDel" title="törlés / delete" style="padding:2px 8px">🗑</button></div><span class="sub" id="whoSub"></span></div></div>
   <nav id="tabs"></nav>
   <div class="upd" id="upd">
     <div class="ver"><span>limbic <b id="updVer">–</b></span><span id="updHead"></span></div>
@@ -1182,7 +1182,7 @@ function renderHermes(){
       <div class="row" style="gap:10px;align-items:center"><b style="font-size:15px">${esc(p.id)}</b>
         <span class="chip">${p.has_agent?"✓ ":""}${hT("limbic agent","limbic agent")}${p.has_agent?" ("+esc(p.agent)+")":""}</span>
         <span class="chip">${p.plugin_enabled?"✓ ":""}plugin</span>${p.model?`<span class="sub">${esc(p.model)}</span>`:""}
-        <div class="sp"></div><button class="${done?"ghost":"primary"} small" data-hgo="${esc(p.id)}">${done?hT("Újrakonfigurálás","Reconfigure"):hT("Felvétel","Add")}</button></div>
+        <div class="sp"></div>${done?`<span class="sub">✓ ${hT("felvéve","added")}</span> `:""}<button class="${done?"ghost":"primary"} small" data-hgo="${esc(p.id)}">${done?hT("Újra","Redo"):hT("+ Hozzáadás","+ Add")}</button></div>
       <div class="row" style="gap:8px;margin-top:10px"><input data-hname value="${esc(p.name)}" style="width:160px" title="${hT("név","name")}">
         <select data-hlang><option value="hu"${p.lang==="hu"?" selected":""}>HU</option><option value="en"${p.lang==="en"?" selected":""}>EN</option></select></div>
       <textarea data-hdesc rows="2" style="width:100%;margin-top:8px" ${p.has_agent?"disabled":""}>${esc(p.description)}</textarea>
@@ -1211,6 +1211,19 @@ async function hermesConnect(id){
   }catch(e){ logEl.textContent=String(e); btn.disabled=false; btn.textContent=hT("Újra","Retry"); }
 }
 $("#hermesBtn").onclick=openHermes;
+$("#agentAdd").onclick=openHermes;
+$("#agentDel").onclick=async()=>{
+  if(!agent) return;
+  const h=await hermesProbe(); const pr=h&&(h.profiles||[]).find(x=>x.agent===agent&&x.plugin_enabled);
+  if(!confirm(hT(`Törlöd a(z) „${agent}” profilt a limbicből? Minden érzése, emléke és kapcsolata elvész.`,`Delete "${agent}" from limbic? All its feelings, memories and relationships are lost.`))) return;
+  if(pr){
+    const off=confirm(hT(`A Hermes „${pr.id}” profiljában a limbic plugin be van kapcsolva, és következő üzenetnél újra létrehozná. Kikapcsoljam ott is? (OK = igen)`,`The limbic plugin is enabled in Hermes profile "${pr.id}" and would recreate it on the next message. Disable it there too? (OK = yes)`));
+    if(off){ const r=await api(`/api/hermes/profiles/${encodeURIComponent(pr.id)}/disconnect`,{method:"POST",body:JSON.stringify({restart:true})}); toast((r.plugin?"⚠ ":"✓ plugin off: ")+pr.id); }
+  }
+  await api(`/api/agents/${encodeURIComponent(agent)}`,{method:"DELETE"});
+  toast("✓ "+hT("törölve","deleted")+": "+agent); agent=null; localStorage.removeItem("limbic.agent");
+  await loadAgents(); if(agent){ await loadTemp(); buildTabs(); refresh(true); } hermesProbe();
+};
 $("#hmClose").onclick=()=>$("#hmModal").classList.remove("on");
 $("#hmModal").addEventListener("click",e=>{ if(e.target.id==="hmModal") $("#hmModal").classList.remove("on"); });
 $("#updBtn").onclick=()=>{ if(upd&&upd.behind>0) openUpd(); else checkUpdate(true); };
