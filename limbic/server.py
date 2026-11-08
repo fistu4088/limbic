@@ -168,6 +168,10 @@ def make_handler(hub: Hub, token: str | None):
                     return self._send(404, {"error": "not found"})
                 if parts[1:2] == ["update"]:
                     return self._update(method, parts[2:], q)
+                if parts[1:2] == ["hermes"]:
+                    if not self._authorized():   # profile list shows persona text: token even for GET
+                        return self._send(401, {"error": "unauthorized"})
+                    return self._hermes(method, parts[2:], self._body() if method == "POST" else {})
                 with hub.lock:
                     return self._api(method, parts[1:], q)
             except KeyError as exc:
@@ -193,6 +197,51 @@ def make_handler(hub: Hub, token: str | None):
                     return self._send(403, {"error": str(exc)})
                 except RuntimeError as exc:
                     return self._send(409, {"error": str(exc)})
+            return self._send(404, {"error": "not found"})
+
+        def _hermes(self, method: str, p: list[str], body: dict) -> None:
+            from . import hermes
+            root = hermes.find_hermes_root()
+            if method == "GET" and not p:
+                profiles = hermes.list_profiles(root)
+                with hub.lock:
+                    known = {a["id"] for a in hub.store.list_agents()}
+                for pr in profiles:
+                    pr["has_agent"] = pr["agent"] in known
+                    pr.pop("home", None)
+                return self._send(200, {"found": root is not None, "cli": bool(hermes.hermes_cli()),
+                                        "profiles": profiles})
+            if method == "POST" and len(p) == 3 and p[0] == "profiles" and p[2] == "connect":
+                prof = next((x for x in hermes.list_profiles(root) if x["id"] == p[1]), None)
+                if prof is None:
+                    return self._send(404, {"error": f"no Hermes profile {p[1]}"})
+                other = prof.get("url") and prof["url"].rstrip("/") != hub.public_url
+                if body.get("plugin", True) and prof["plugin_enabled"] and other and not body.get("force"):
+                    return self._send(409, {"error": f"profile {prof['id']} already uses another limbic server "
+                                                     f"({prof['url']}); send force=true to switch it here",
+                                            "conflict": prof["url"]})
+                aid = str(body.get("agent") or prof["agent"]).strip()
+                if not ID_RE.fullmatch(aid):
+                    return self._send(400, {"error": "agent id must match [\\w.-]{1,64}"})
+                temp = hermes.temperament_for(prof, body.get("name"), body.get("description"))
+                with hub.lock:
+                    created = hub.store.get_agent(aid) is None
+                    if created:
+                        hub.get(aid, create=True, temperament=temp)
+                out = {"agent": aid, "created": created, "plugin": False, "log": []}
+                if body.get("plugin", True):
+                    if not getattr(hub, "token_file", None) and getattr(hub, "token", None):
+                        return self._send(409, {"error": "server has a token but no token file", **out})
+                    lang = body.get("lang") if body.get("lang") in ("hu", "en") else prof["lang"]
+                    settings = hermes.plugin_settings(hub.public_url, aid, str(getattr(hub, "token_file", "") or ""), lang)
+                    try:
+                        ok, lines = hermes.configure_profile(Path(prof["home"]), settings)
+                    except (OSError, FileExistsError) as exc:
+                        ok, lines = False, [str(exc)]
+                    out.update(plugin=ok, log=lines)
+                    if ok and body.get("restart"):
+                        out["restart"] = hermes.restart_gateway(Path(prof["home"]))
+                return self._send(201 if created else 200, out)
             return self._send(404, {"error": "not found"})
 
         def _api(self, method: str, p: list[str], q: dict) -> None:
@@ -381,11 +430,32 @@ def appraiser_factory_from_env():
     return lambda temp: LLMAppraiser(base, model, api_key=key, temperament=temp)
 
 
+def _ensure_token_file(token: str | None, db: str) -> str:
+    """A file holding the write token, for Hermes plugins on this machine (mode 600)."""
+    if not token:
+        return ""
+    path = Path(os.environ.get("LIMBIC_TOKEN_FILE") or Path(db).resolve().parent / "token")
+    try:
+        if not path.is_file() or path.read_text(encoding="utf-8").strip() != token:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(token + "\n", encoding="utf-8")
+            if os.name != "nt":
+                path.chmod(0o600)
+        return str(path)
+    except OSError:
+        return ""
+
+
 def serve(db: str = "limbic.db", host: str = "127.0.0.1", port: int = 8770,
           token: str | None = None, autonomy_interval: float = 60.0) -> ThreadingHTTPServer:
     hub = Hub(Store(db), appraiser_factory_from_env())
     httpd = ThreadingHTTPServer((host, port), make_handler(hub, token or os.environ.get("LIMBIC_TOKEN")))
     httpd.hub = hub  # type: ignore[attr-defined]
+    tok = token or os.environ.get("LIMBIC_TOKEN")
+    shown = "127.0.0.1" if host in ("0.0.0.0", "", "::") else host
+    hub.public_url = f"http://{shown}:{httpd.server_address[1]}"  # type: ignore[attr-defined]
+    hub.token = tok  # type: ignore[attr-defined]
+    hub.token_file = _ensure_token_file(tok, db)  # type: ignore[attr-defined]
     if autonomy_interval > 0:
         hub.start_scheduler(autonomy_interval)
     return httpd

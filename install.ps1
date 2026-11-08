@@ -1,4 +1,7 @@
 $ErrorActionPreference = 'Stop'
+# Extra installer flags (e.g. -y) can be passed via $env:LIMBIC_INSTALL_ARGS
+$extra = @()
+if ($env:LIMBIC_INSTALL_ARGS) { $extra = $env:LIMBIC_INSTALL_ARGS -split ' ' }
 $repo = 'https://github.com/fistu4088/limbic.git'
 $work = Join-Path $env:TEMP ('limbic-install-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work | Out-Null
@@ -24,12 +27,12 @@ try {
         if (Get-Command py -ErrorAction SilentlyContinue) {
             & py -3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"
             if ($LASTEXITCODE -ne 0) { throw 'Python 3.10+ is required. Upgrade Python and run this again.' }
-            & py -3 -m limbic.installer --source $source
+            & py -3 -m limbic.installer --source $source @extra
         }
         elseif (Get-Command python -ErrorAction SilentlyContinue) {
             & python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"
             if ($LASTEXITCODE -ne 0) { throw 'Python 3.10+ is required. Upgrade Python and run this again.' }
-            & python -m limbic.installer --source $source
+            & python -m limbic.installer --source $source @extra
         }
         else {
             throw 'Python 3.10+ is required. Install Python from python.org and run this again.'

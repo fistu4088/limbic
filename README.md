@@ -29,7 +29,13 @@ Windows PowerShell (Git is optional; without it the installer downloads a source
 irm https://raw.githubusercontent.com/fistu4088/limbic/main/install.ps1 | iex
 ```
 
-The console wizard asks for an install location, agent ID, optional appraiser API/model and whether to start the server. It creates a private API token, installs to your user directory, creates the first agent and opens the dashboard. The server binds to `127.0.0.1` by default. Review the script before running it if you prefer to inspect downloaded code first.
+**Next, next, finish.** Press Enter at every question and you get a working setup: limbic is installed for your user, starts at login, and the dashboard opens. No code to type.
+
+**Hermes Agent is detected automatically.** If Hermes is installed on the same computer, the installer lists its profiles and offers to connect them: each chosen profile gets its own limbic agent (name and short description taken from the profile's `SOUL.md`), the plugin is copied into the profile and enabled through the `hermes` command, and — if you agree — the Hermes gateway is restarted so the plugin loads. It never re-points a profile that already uses another limbic server unless you pick it explicitly. If the profile talks to an OpenAI-compatible model (`model.base_url` in its `config.yaml`), the installer offers to use that same model for appraisal.
+
+Later you can add profiles from the dashboard: the **☿ Hermes** button in the sidebar lists the Hermes profiles on that machine and adds any of them as a limbic agent with one click (the list needs the API token, because it shows persona text).
+
+Unattended: `bash install.sh --yes` (Linux) or `$env:LIMBIC_INSTALL_ARGS='--yes'` before the PowerShell one-liner. Other flags: `--profiles default,aria`, `--profiles none`, `--no-autostart`, `--no-restart`, `--dir <path>`. Running the installer again updates the existing install in place and keeps its data. The server binds to `127.0.0.1` by default. Review the script before running it if you prefer to inspect downloaded code first.
 
 ## Why not just "tell the LLM it is sad"?
 

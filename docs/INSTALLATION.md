@@ -13,7 +13,13 @@ This guide takes you from a clean machine to a running dashboard and API. It cov
 
 ## Quick interactive install
 
-The installer works without administrator access and asks each question when it reaches that step. It installs a copy under your user account; it does not overwrite a non-empty target directory.
+The installer works without administrator access. Press Enter at every question for the recommended setup ("next, next, finish"), or type `c` at the first question to choose directory, address, port and appraiser yourself. It installs a copy under your user account; running it again updates that copy in place and keeps `data/` (database, token, settings).
+
+**Hermes Agent.** If Hermes is installed on the computer (found via `HERMES_HOME`, the `hermes` command or `~/.hermes`), the installer lists its profiles and connects the ones you choose (Enter = every profile not yet connected). For each profile it creates a limbic agent named after the persona in `SOUL.md`, backs up `config.yaml`, copies the plugin to `<profile>/plugins/limbic`, writes the plugin settings with `hermes config set` and enables it with `hermes plugins enable limbic`. A profile already pointing at another limbic server is left alone unless you pick it by number. Afterwards close and reopen any open Hermes Desktop window once. Point limbic at a Hermes folder in a non-standard place with `LIMBIC_HERMES_HOME`.
+
+**Autostart.** On Linux it installs a `systemd --user` unit (`~/.config/systemd/user/limbic.service`), on macOS a LaunchAgent, on Windows a hidden starter in the Startup folder. Decline with `--no-autostart`.
+
+**Flags.** `--yes` (no questions), `--profiles all|none|default,aria`, `--no-autostart`, `--no-restart` (do not restart the Hermes gateway), `--dir <path>`. In PowerShell pass them with `$env:LIMBIC_INSTALL_ARGS='--yes'` before the one-liner.
 
 ### Linux
 
@@ -27,9 +33,9 @@ tmp=$(mktemp) && { curl -fsSL https://raw.githubusercontent.com/fistu4088/limbic
 irm https://raw.githubusercontent.com/fistu4088/limbic/main/install.ps1 | iex
 ```
 
-The wizard asks for the install directory, bind address and port, agent ID and display name, then offers three appraiser choices: skip (use the built-in fallback), configure a hosted API, or configure a local OpenAI-compatible server. Hosted API keys are entered with hidden input. The default bind address is `127.0.0.1`, so the dashboard is only accessible from that computer. The wizard warns and asks for confirmation before using another address: dashboard and read-only API requests are not authenticated, so only bind to a trusted, firewalled network.
+In custom mode the wizard asks for the install directory, bind address and port, then offers three appraiser choices: skip (use the built-in fallback), configure a hosted API, or configure a local OpenAI-compatible server. Hosted API keys are entered with hidden input. The default bind address is `127.0.0.1`, so the dashboard is only accessible from that computer. The wizard warns and asks for confirmation before using another address: dashboard and read-only API requests are not authenticated, so only bind to a trusted, firewalled network.
 
-When prompted, choosing to start the server creates the agent through the authenticated API, starts the dashboard and opens it in a browser. The generated write token and optional appraiser key are stored in `data/limbic-install.json` inside the install directory. On Linux/macOS the installer restricts the data directory to the current user (`0700`) and the settings file to `0600`; Windows uses the current user's normal directory permissions. Do not share that file or paste its contents into issue reports.
+The installer starts the server, creates the agents through the authenticated API and opens the dashboard in a browser. Without Hermes it creates one agent called `default`. The generated write token and optional appraiser key are stored in `data/limbic-install.json` inside the install directory. On Linux/macOS the installer restricts the data directory to the current user (`0700`) and the settings file to `0600`; Windows uses the current user's normal directory permissions. Do not share that file or paste its contents into issue reports.
 
 The server log and SQLite database are in the install directory's `data/` folder. The wizard prints the process ID and a stop command. To start it later, run `python3 <install-directory>/start-limbic.py` on Linux or `py -3 <install-directory>\\start-limbic.py` in PowerShell. You can remove the installation by stopping the server and deleting that install directory; this also deletes its database and token.
 

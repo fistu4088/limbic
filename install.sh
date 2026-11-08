@@ -21,4 +21,9 @@ fi
 printf 'Downloading limbic…\n'
 git clone --depth 1 --quiet "$REPO" "$WORK/limbic"
 cd "$WORK/limbic"
-python3 -m limbic.installer --source "$WORK/limbic"
+# piped from curl: read the answers from the terminal, not from the pipe
+if [ -t 0 ] || ! { : </dev/tty; } 2>/dev/null; then
+  python3 -m limbic.installer --source "$WORK/limbic" "$@"
+else
+  python3 -m limbic.installer --source "$WORK/limbic" "$@" </dev/tty
+fi

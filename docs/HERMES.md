@@ -197,6 +197,13 @@ dashboard asks for the token on the first save.
 
 ## 6. Connect a Hermes profile
 
+> **Shortcut.** The installer (`install.sh` / `install.ps1`) and the dashboard's **☿ Hermes** button do
+> 6.1–6.3 for you: they detect the Hermes profiles on the machine, create one agent per profile from its
+> `SOUL.md`, copy and enable the plugin and write `url`, `agent`, `token_file` and `lang`. The plugin also
+> creates its own agent on first contact if it is missing, and finds the token of a per-user install
+> (`~/.local/share/limbic/data/token`, `%LOCALAPPDATA%\limbic\data\token`) when `token_file` is not set.
+> The manual steps below are for servers, other machines and custom setups.
+
 ### 6.1 Copy the plugin into the profile
 
 Every Hermes profile has its own `plugins` folder:

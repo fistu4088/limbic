@@ -225,6 +225,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:12.5px}
     <button class="small" id="updBtn">⟳</button>
   </div>
   <div class="sidefoot">
+    <button class="ghost small" id="hermesBtn" title="Hermes Agent">☿ Hermes<span class="badge" id="b-hermes" style="display:none"></span></button>
     <button class="ghost small" id="autoBtn"></button>
     <button class="ghost small" id="langBtn">EN</button>
     <div class="pulse" id="pulse"></div>
@@ -400,6 +401,12 @@ details summary{cursor:pointer;color:var(--mute);font-size:12.5px}
   <div class="steps" id="umSteps" style="display:none"><div></div><div></div><div></div></div>
   <div id="umBody" style="margin-top:14px"></div>
   <div class="row" style="margin-top:18px"><div class="sp"></div><button class="ghost" id="umClose"></button><button class="primary" id="umGo"></button></div>
+</div></div>
+<div class="modal" id="hmModal"><div class="box">
+  <h2 id="hmTitle">Hermes</h2><div class="sub" id="hmSub"></div>
+  <div id="hmBody" style="margin-top:14px"></div>
+  <label class="sub" style="display:flex;gap:8px;align-items:center;margin-top:14px"><input type="checkbox" id="hmRestart" checked><span id="hmRestartL"></span></label>
+  <div class="row" style="margin-top:18px"><div class="sp"></div><button class="ghost" id="hmClose"></button></div>
 </div></div>
 <div class="tip" id="tip"></div>
 <div class="toast" id="toast"></div>
@@ -1151,6 +1158,61 @@ async function doUpdate(){
   }
   $("#umSub").textContent=ut("slow"); $("#umClose").disabled=false;
 }
+// ---------------------------------------------------------------- Hermes profiles -> limbic agents
+let hermesInfo=null;
+const hT=(hu,en)=>HU()?hu:en;
+async function hermesProbe(){
+  const tok=localStorage.getItem("limbic.token");
+  try{ const r=await fetch("/api/hermes",{headers:tok?{Authorization:"Bearer "+tok}:{}}); if(!r.ok) return null; hermesInfo=await r.json(); }
+  catch(e){ return null; }
+  const n=(hermesInfo.profiles||[]).filter(p=>!p.has_agent||!p.plugin_enabled).length, b=$("#b-hermes");
+  b.textContent=n; b.style.display=n?"":"none"; return hermesInfo;
+}
+function renderHermes(){
+  const h=hermesInfo||{profiles:[]};
+  $("#hmTitle").textContent=hT("Hermes profilok","Hermes profiles");
+  $("#hmRestartL").textContent=hT("Hermes gateway újraindítása, hogy azonnal betöltse (Telegram/Discord)","Restart the Hermes gateway so it loads right away (Telegram/Discord)");
+  $("#hmClose").textContent=hT("Bezár","Close");
+  if(!h.found){ $("#hmSub").textContent=hT("Ezen a gépen nem találtam Hermes Agentet.","No Hermes Agent found on this computer."); $("#hmBody").innerHTML=`<div class="sub">${hT("Ha máshol van, indítsd a limbicet LIMBIC_HERMES_HOME=&lt;mappa&gt; beállítással.","If it lives elsewhere, start limbic with LIMBIC_HERMES_HOME=&lt;folder&gt;.")}</div>`; return; }
+  $("#hmSub").textContent=hT("Válaszd ki, melyik Hermes profil kapjon érzéseket. A név és a leírás a profil SOUL.md-jéből jön, itt átírhatod.","Pick which Hermes profiles get feelings. Name and description come from the profile's SOUL.md; edit them here.")
+    +(h.cli?"":hT(" (A hermes parancsot nem találtam: az agent létrejön, a plugint kézzel kell bekapcsolni.)"," (hermes command not found: the agent is created, enable the plugin by hand.)"));
+  $("#hmBody").innerHTML=h.profiles.map(p=>{
+    const done=p.has_agent&&p.plugin_enabled;
+    return `<div class="card" style="padding:14px 16px;margin-bottom:10px" data-hp="${esc(p.id)}">
+      <div class="row" style="gap:10px;align-items:center"><b style="font-size:15px">${esc(p.id)}</b>
+        <span class="chip">${p.has_agent?"✓ ":""}${hT("limbic agent","limbic agent")}${p.has_agent?" ("+esc(p.agent)+")":""}</span>
+        <span class="chip">${p.plugin_enabled?"✓ ":""}plugin</span>${p.model?`<span class="sub">${esc(p.model)}</span>`:""}
+        <div class="sp"></div><button class="${done?"ghost":"primary"} small" data-hgo="${esc(p.id)}">${done?hT("Újrakonfigurálás","Reconfigure"):hT("Felvétel","Add")}</button></div>
+      <div class="row" style="gap:8px;margin-top:10px"><input data-hname value="${esc(p.name)}" style="width:160px" title="${hT("név","name")}">
+        <select data-hlang><option value="hu"${p.lang==="hu"?" selected":""}>HU</option><option value="en"${p.lang==="en"?" selected":""}>EN</option></select></div>
+      <textarea data-hdesc rows="2" style="width:100%;margin-top:8px" ${p.has_agent?"disabled":""}>${esc(p.description)}</textarea>
+      <div class="sub" data-hlog style="margin-top:6px;white-space:pre-wrap"></div></div>`;}).join("")||`<div class="sub">${hT("Nincs profil.","No profiles.")}</div>`;
+  document.querySelectorAll("[data-hgo]").forEach(b=>b.onclick=()=>hermesConnect(b.dataset.hgo));
+}
+async function openHermes(){ $("#hmModal").classList.add("on"); $("#hmBody").innerHTML='<span class="spin">↻</span>';
+  hermesInfo=await api("/api/hermes"); renderHermes(); hermesProbe(); }
+async function hermesConnect(id){
+  const card=document.querySelector(`[data-hp="${CSS.escape(id)}"]`), btn=card.querySelector("[data-hgo]"), logEl=card.querySelector("[data-hlog]");
+  btn.disabled=true; btn.innerHTML='<span class="spin">↻</span>';
+  const body={name:card.querySelector("[data-hname]").value.trim(),lang:card.querySelector("[data-hlang]").value,restart:$("#hmRestart").checked};
+  const d=card.querySelector("[data-hdesc]"); if(!d.disabled) body.description=d.value.trim();
+  const pr=(hermesInfo.profiles||[]).find(x=>x.id===id);
+  if(pr&&pr.plugin_enabled&&pr.url&&pr.url.replace(/\/$/,"")!==location.origin){
+    if(!confirm(hT(`Ez a profil most egy másik limbicet használ (${pr.url}). Átállítsam erre?`,`This profile currently uses another limbic (${pr.url}). Switch it to this one?`))){ btn.disabled=false; renderHermes(); return; }
+    body.force=true; }
+  try{
+    const r=await api(`/api/hermes/profiles/${encodeURIComponent(id)}/connect`,{method:"POST",body:JSON.stringify(body)});
+    logEl.textContent=(r.error?r.error+"\n":"")+(r.log||[]).join("\n")+(r.restart?"\n"+(r.restart[0]?hT("gateway újraindítva","gateway restarted"):r.restart[1]):"")
+      +(r.plugin?"\n"+hT("Ha a Hermes Desktop nyitva van, zárd be és nyisd újra egyszer.","If Hermes Desktop is open, close and reopen it once."):"");
+    toast((r.plugin?"✓ ":"⚠ ")+id+" → "+(r.agent||""));
+    await loadAgents(); if(r.agent){ agent=r.agent; localStorage.setItem("limbic.agent",agent); $("#agent").value=agent; await loadTemp(); buildTabs(); refresh(true); }
+    hermesInfo=await api("/api/hermes"); const keep=logEl.textContent; renderHermes();
+    const nl=document.querySelector(`[data-hp="${CSS.escape(id)}"] [data-hlog]`); if(nl) nl.textContent=keep; hermesProbe();
+  }catch(e){ logEl.textContent=String(e); btn.disabled=false; btn.textContent=hT("Újra","Retry"); }
+}
+$("#hermesBtn").onclick=openHermes;
+$("#hmClose").onclick=()=>$("#hmModal").classList.remove("on");
+$("#hmModal").addEventListener("click",e=>{ if(e.target.id==="hmModal") $("#hmModal").classList.remove("on"); });
 $("#updBtn").onclick=()=>{ if(upd&&upd.behind>0) openUpd(); else checkUpdate(true); };
 $("#umClose").onclick=()=>$("#updModal").classList.remove("on");
 $("#umGo").onclick=doUpdate;
@@ -1158,7 +1220,7 @@ $("#updModal").addEventListener("click",e=>{ if(e.target.id==="updModal" && !$("
 $("#nowBtn").onclick=()=>{ $("#nowBtn").innerHTML='<span class="spin">↻</span>'; refresh(true).finally(()=>$("#nowBtn").textContent="↻"); };
 document.addEventListener("keydown",e=>{
   if(e.target.matches("input,textarea,select")||e.ctrlKey||e.metaKey||e.altKey) { if(e.key==="Escape") e.target.blur(); return; }
-  if(e.key==="Escape"){ $("#updModal").classList.remove("on"); return; }
+  if(e.key==="Escape"){ $("#updModal").classList.remove("on"); $("#hmModal").classList.remove("on"); return; }
   const n=+e.key; if(n>=1&&n<=TABS.length){ tab=TABS[n-1]; localStorage.setItem("limbic.tab",tab); history.replaceState(null,"","#"+tab); buildTabs(); render(); return; }
   if(e.key==="r"||e.key==="R"){ $("#nowBtn").click(); return; }
   if(e.key==="/"){ e.preventDefault(); tab="memory"; buildTabs(); render(); setTimeout(()=>$("#evSearch").focus(),50); }
@@ -1166,6 +1228,7 @@ document.addEventListener("keydown",e=>{
 setInterval(()=>{ if(!document.hidden) checkUpdate(true); }, 30*60*1000);
 
 (async()=>{ if(!TABS.includes(tab)) tab="overview"; $("#pLang").value=lang; applyI18n(); await loadAgents(); await loadTemp(); buildTabs(); await refresh(); checkUpdate(true);
+  hermesProbe().then(h=>{ if(h&&h.found&&!agent&&h.profiles.length) openHermes(); });
   setInterval(()=>{ if(auto && !document.hidden) refresh(true); },10000); })();
 </script>
 </body>

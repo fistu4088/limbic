@@ -200,6 +200,19 @@ def _profile_name() -> str:
     return home.name if home.parent.name == "profiles" else "default"
 
 
+def _installed_token() -> str:
+    """Token of a per-user limbic install (python -m limbic.installer), if the setting is missing."""
+    bases = [os.environ.get("LOCALAPPDATA"), os.environ.get("XDG_DATA_HOME"),
+             str(Path.home() / ".local" / "share"), str(Path.home() / "AppData" / "Local")]
+    for b in bases:
+        if b:
+            try:
+                return (Path(b) / "limbic" / "data" / "token").read_text().strip()
+            except OSError:
+                continue
+    return ""
+
+
 class Bridge:
     def __init__(self, settings_fn, ctx=None) -> None:
         self._settings_fn = settings_fn
@@ -207,6 +220,7 @@ class Bridge:
         self.sessions: dict[str, tuple[str, bool, str]] = {}   # session_id -> (speaker, private, platform)
         self.local_sessions: dict[str, tuple[str, float]] = {}  # speaker -> (desktop session_id, seen)
         self._warned = 0.0
+        self._created: set[str] = set()
         self._stop = threading.Event()
         self._thread = None
 
@@ -225,10 +239,33 @@ class Bridge:
                 tok = Path(c["token_file"]).read_text().strip()
             except Exception:
                 tok = ""
-        c["_token"] = tok or os.environ.get("LIMBIC_TOKEN", "")
+        c["_token"] = tok or os.environ.get("LIMBIC_TOKEN", "") or _installed_token()
         return c
 
     def _req(self, c: dict, method: str, path: str, body: dict | None, timeout: float) -> str:
+        try:
+            return self._req1(c, method, path, body, timeout)
+        except urllib.error.HTTPError as exc:
+            # first contact with a fresh limbic: create this profile's agent once, then retry
+            if exc.code != 404 or c["agent"] in self._created or not c["_token"]:
+                raise
+            try:
+                missing = b"unknown agent" in exc.read()
+            except Exception:
+                missing = False
+            if not missing:
+                raise
+            self._created.add(c["agent"])
+            req = urllib.request.Request(
+                f"{c['url'].rstrip('/')}/api/agents", method="POST",
+                data=json.dumps({"id": c["agent"], "temperament": {"name": c["agent"].replace("-", " ").title()}}).encode(),
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {c['_token']}"})
+            with urllib.request.urlopen(req, timeout=10):
+                pass
+            log.info("limbic: created agent %s", c["agent"])
+            return self._req1(c, method, path, body, timeout)
+
+    def _req1(self, c: dict, method: str, path: str, body: dict | None, timeout: float) -> str:
         headers = {"Content-Type": "application/json"}
         if c["_token"]:
             headers["Authorization"] = f"Bearer {c['_token']}"
