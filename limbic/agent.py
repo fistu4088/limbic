@@ -80,6 +80,7 @@ class Limbic:
              source: str = "manual", speaker: str | None = None, private: bool = False) -> dict:
         ap = appraisal if isinstance(appraisal, Appraisal) else Appraisal.from_dict(appraisal)
         t = now if now is not None else self.clock()
+        speaker = self._who(speaker)
         effects = self.engine.apply(self.state, ap, t, speaker=speaker, private=private)
         eid = self.store.add_event(self.id, t, ap.event, source, speaker or ap.target,
                                    ap.to_dict(), effects)
@@ -125,6 +126,7 @@ class Limbic:
         if fn is None:
             from .appraisal import KeywordAppraiser
             fn = KeywordAppraiser(self.engine.t).appraise_image
+        speaker = self._who(speaker)
         aps = fn(text, question=question, shown_by=speaker)
         t = now if now is not None else self.clock()
         past = at is not None and at < t - 60
@@ -294,7 +296,11 @@ class Limbic:
         self.save()
 
     def note_channel(self, name: str, channel: str, now: float | None = None) -> None:
+        from .engine import bond_allowed, canonical
         t = now if now is not None else self.clock()
+        name = canonical(self.engine.t, name)
+        if not bond_allowed(self.engine.t, name):
+            return
         r = self.state.relationships.setdefault(name, needs.new_relationship(t))
         needs.normalize_relationship(r, t)
         r["last_channel"] = str(channel)[:40]
@@ -302,6 +308,8 @@ class Limbic:
 
     def set_relationship(self, name: str, **fields) -> dict:
         """Operator-only settings: consent, reachable, contact."""
+        from .engine import canonical
+        name = canonical(self.engine.t, name)
         t = self.state.t
         r = self.state.relationships.setdefault(name, needs.new_relationship(t))
         needs.normalize_relationship(r, t)
@@ -332,6 +340,125 @@ class Limbic:
                                  {"changed": changed})
         self.save(force_snapshot=bool(changed))
         return r
+
+    # ---- partners (who the agent may have a relationship with) -------
+    def _log_op(self, who: str, summary: str, effects: dict) -> None:
+        self.store.add_event(self.id, self.clock(), "operator_edit", "operator", who,
+                             {"event": "operator_edit", "summary": summary}, effects)
+
+    def _drop_bond(self, name: str) -> dict:
+        """Forget a relationship and every feeling aimed at that name."""
+        s = self.state
+        had = s.relationships.pop(name, None) is not None
+        emo = [k for k, e in s.emotions.items() if e.get("target") == name]
+        for k in emo:
+            del s.emotions[k]
+        for k in [k for k in s.habituation if k.endswith("|" + name)]:
+            del s.habituation[k]
+        s.intents = [i for i in s.intents if i.get("target") != name]
+        return {"relationship": had, "emotions": len(emo)}
+
+    def add_partner(self, name: str) -> dict:
+        from .engine import canonical
+        name = canonical(self.engine.t, str(name or "").strip())[:80]
+        if not name:
+            raise ValueError("name required")
+        parts = list(self.engine.t.partners or [])
+        if name not in parts:
+            parts.append(name)
+            self.engine.t.partners = parts
+            r = self.state.relationships.setdefault(name, needs.new_relationship(self.state.t))
+            needs.normalize_relationship(r, self.state.t)
+            r["is_person"] = True
+            self._log_op(name, f"operator added {name} as a relationship", {"partners": parts})
+        self.save(force_snapshot=True)
+        return {"partners": parts}
+
+    def remove_partner(self, name: str) -> dict:
+        parts = [p for p in (self.engine.t.partners or []) if p != name]
+        if len(parts) == len(self.engine.t.partners or []):
+            raise KeyError(name)
+        if not parts:
+            raise ValueError("the last partner cannot be removed (an empty list means open to anyone)")
+        self.engine.t.partners = parts
+        dropped = self._drop_bond(name)
+        self._log_op(name, f"operator removed {name} as a relationship", {"partners": parts, **dropped})
+        self.save(force_snapshot=True)
+        return {"partners": parts, "dropped": dropped}
+
+    def set_alias(self, alias: str, name: str) -> dict:
+        alias, name = str(alias).strip(), str(name).strip()
+        if not alias or not name or alias == name:
+            raise ValueError("alias and name required")
+        al = dict(self.engine.t.aliases or {})
+        al[alias] = name
+        self.engine.t.aliases = al
+        self.save()
+        return {"aliases": al}
+
+    def merge_relationship(self, src: str, dst: str, alias: bool = True) -> dict:
+        """Everything lived with `src` belongs to `dst` (same person under another id):
+        levels add up (clamped), counters sum, feelings aimed at src move to dst,
+        recorded events are re-attributed, and src becomes an alias of dst."""
+        from .engine import _add_rel_levels
+        s, t = self.state, self.state.t
+        if src == dst:
+            raise ValueError("same name")
+        a = s.relationships.get(src)
+        b = s.relationships.setdefault(dst, needs.new_relationship(t))
+        needs.normalize_relationship(b, t)
+        moved_emo = 0
+        if a is not None:
+            needs.normalize_relationship(a, t)
+            _add_rel_levels(b, a)
+            s.relationships.pop(src, None)
+        for k in [k for k, e in s.emotions.items() if e.get("target") == src]:
+            e = s.emotions.pop(k)
+            nk = f"{e['name']}@{dst}"
+            e["target"] = dst
+            if nk in s.emotions:
+                o = s.emotions[nk]
+                hi, lo = max(o["i"], e["i"]), min(o["i"], e["i"])
+                o["i"] = min(1.0, hi + 0.35 * lo * (1 - hi))
+                o["sustained"] = o.get("sustained") or e.get("sustained", False)
+            else:
+                s.emotions[nk] = e
+            moved_emo += 1
+        for k in [k for k in s.habituation if k.endswith("|" + src)]:
+            nk = k[: -len(src)] + dst
+            s.habituation[nk] = s.habituation.get(nk, 0.0) + s.habituation.pop(k)
+        for i in s.intents:
+            if i.get("target") == src:
+                i["target"] = dst
+        if getattr(s, "thread", None) and isinstance(s.thread, dict) and s.thread.get("partner") == src:
+            s.thread["partner"] = dst
+        events = self.store.reattribute(self.id, src, dst)
+        if alias:
+            al = dict(self.engine.t.aliases or {})
+            al[src] = dst
+            for k, v in list(al.items()):
+                if v == src:
+                    al[k] = dst
+            self.engine.t.aliases = al
+        out = {"merged": src, "into": dst, "relationship": a is not None,
+               "emotions": moved_emo, "events": events}
+        self._log_op(dst, f"operator merged {src} into {dst}", out)
+        self.save(force_snapshot=True)
+        return out
+
+    def prune_relationships(self) -> dict:
+        """Drop every relationship (and feeling aimed at it) outside the partner list."""
+        parts = set(self.engine.t.partners or [])
+        if not parts:
+            raise ValueError("no partners set")
+        names = [n for n in list(self.state.relationships) if n not in parts]
+        emo = 0
+        for n in names:
+            emo += self._drop_bond(n)["emotions"]
+        out = {"relationships": len(names), "emotions": emo}
+        self._log_op("operator", "operator pruned relationships outside the partner list", out)
+        self.save(force_snapshot=True)
+        return out
 
     def set_emotion(self, name: str, target: str | None = None, intensity: float = 0.0) -> dict:
         """Operator-only: set (or clear with 0) one feeling. It then fades like any other
@@ -402,11 +529,16 @@ class Limbic:
         return dict(sx)
 
     # ---- outputs -----------------------------------------------------
+    def _who(self, name: str | None) -> str | None:
+        from .engine import canonical
+        return canonical(self.engine.t, name)
+
     def snapshot(self, interlocutor: str | None = None) -> dict:
-        return self.engine.snapshot(self.state, interlocutor)
+        return self.engine.snapshot(self.state, self._who(interlocutor))
 
     def prompt(self, lang: str = "en", interlocutor: str | None = None, now: float | None = None) -> str:
         self.engine.advance(self.state, now if now is not None else self.clock())
+        interlocutor = self._who(interlocutor)
         block = self.engine.prompt_block(self.state, lang=lang, interlocutor=interlocutor)
         cur = (self.state.leisure or {}).get("current")
         if interlocutor and cur and cur["status"] == "paused":
@@ -414,4 +546,4 @@ class Limbic:
         return block
 
     def modulators(self, interlocutor: str | None = None) -> dict:
-        return self.engine.modulators(self.state, interlocutor)
+        return self.engine.modulators(self.state, self._who(interlocutor))

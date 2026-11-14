@@ -73,6 +73,30 @@ class Store:
                 (agent_id, json.dumps(temperament), json.dumps(state), now, now))
             self.db.commit()
 
+    def reattribute(self, agent_id: str, src: str, dst: str) -> int:
+        """Recorded events of `src` become `dst`'s (speaker column and appraisal target)."""
+        import json as _json
+        n = 0
+        with self.lock:
+            rows = self.db.execute("SELECT id, speaker, appraisal FROM events WHERE agent=? AND "
+                                   "(speaker=? OR appraisal LIKE ?)", (agent_id, src, f"%{src}%")).fetchall()
+            for eid, sp, ap in rows:
+                changed = False
+                if sp == src:
+                    sp, changed = dst, True
+                try:
+                    d = _json.loads(ap) if ap else None
+                except ValueError:
+                    d = None
+                if isinstance(d, dict) and d.get("target") == src:
+                    d["target"], changed = dst, True
+                    ap = _json.dumps(d, ensure_ascii=False)
+                if changed:
+                    self.db.execute("UPDATE events SET speaker=?, appraisal=? WHERE id=?", (sp, ap, eid))
+                    n += 1
+            self.db.commit()
+        return n
+
     def delete_agent(self, agent_id: str) -> None:
         with self.lock:
             for table, col in (("agents", "id"), ("events", "agent"), ("snapshots", "agent")):

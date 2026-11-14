@@ -297,6 +297,35 @@ def make_handler(hub: Hub, token: str | None):
                 if P:
                     mind.set_temperament(self._body())
                 return self._send(200, mind.temperament.to_dict())
+            if sub == "partners":
+                try:
+                    if P and len(rest) == 1:
+                        return self._send(200, mind.add_partner(str(self._body().get("name", ""))))
+                    if method == "DELETE" and len(rest) == 2:
+                        return self._send(200, mind.remove_partner(rest[1]))
+                except KeyError:
+                    return self._send(404, {"error": "not a partner"})
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
+                if G:
+                    return self._send(200, {"partners": mind.temperament.partners,
+                                            "aliases": mind.temperament.aliases})
+            if sub == "aliases" and P:
+                b = self._body()
+                try:
+                    return self._send(200, mind.set_alias(b.get("alias", ""), b.get("name", "")))
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
+            if sub == "relationships" and len(rest) == 3 and rest[2] == "merge" and P:
+                try:
+                    return self._send(200, mind.merge_relationship(rest[1], str(self._body().get("into", ""))))
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
+            if sub == "relationships" and rest[1:] == ["_prune"] and P:
+                try:
+                    return self._send(200, mind.prune_relationships())
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
             if sub == "relationships" and len(rest) == 2 and P:
                 b = self._body()
                 keys = ("consent", "reachable", "contact", "affection", "trust", "resentment", "fear",

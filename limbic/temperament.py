@@ -152,6 +152,12 @@ class Temperament:
     leisure_resume_bonus: float = 0.35
     leisure_idle_tau_h: float = 3.0   # empty hours make her restless on this time scale
     journal_relief: float = 0.15      # writing the day down eases negative feelings this much
+    # Who the agent has relationships with. Empty = anyone who talks to it (open).
+    # Non-empty = ONLY these people; others are still heard, but build no bond and
+    # feelings are never aimed at them. The operator adds people on the dashboard.
+    partners: list[str] = field(default_factory=list)
+    # Other names/ids of the same person ("uid:0" -> "Ádám"); applied everywhere.
+    aliases: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)

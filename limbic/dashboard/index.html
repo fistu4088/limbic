@@ -298,7 +298,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:12.5px}
 
 <!-- ============ RELATIONSHIPS ============ -->
 <section class="page" id="p-rels">
-  <div class="card c8"><h3><span data-t="people"></span><span class="hint sub" data-t="people_hint"></span></h3><div class="grid" id="people"></div></div>
+  <div class="card c8"><h3><span data-t="people"></span><span class="hint sub" data-t="people_hint"></span><span class="sp" style="flex:1"></span><button class="ghost small" id="partnerAddBtn" onclick="partnerAdd()" title="Kapcsolat hozzáadása / add relationship">＋</button></h3><div class="sub" id="partnerInfo" style="margin-bottom:6px"></div><div class="grid" id="people"></div></div>
   <div class="card c4"><h3 data-t="thread"></h3><div id="thread"></div><div id="steering" style="margin-top:8px"></div></div>
   <div class="card c12" id="sexCard" style="display:none"><h3><span>Intimitás — tanult nyitottság / learned openness</span></h3><div id="sexuality"></div></div>
   <div class="card c6"><h3><span data-t="characters"></span><span class="hint sub" data-t="characters_hint"></span></h3><div id="chars"></div></div>
@@ -748,7 +748,9 @@ function renderRels(){
   const desc=r=>{ const p=[]; if(r.affection>0.5)p.push(hu?"erősen kötődik":"strongly attached"); else if(r.affection>0.2)p.push(hu?"kedveli":"likes"); if(r.trust>0.3)p.push(hu?"megbízik benne":"trusts"); else if(r.trust<-0.2)p.push(hu?"nem bízik benne":"distrusts");
     if(r.resentment>0.2)p.push(hu?"neheztel rá":"resents"); if(r.fear>0.2)p.push(hu?"tart tőle":"wary"); return p.join(", ")||(hu?"semleges":"neutral"); };
   if(relEditing) return;   // don't redraw under the operator's hands
-  $("#people").innerHTML = people.length? people.map(([n,r])=>`<div class="rel"><div class="row"><div class="name">${esc(n)}</div><div class="sp"></div><button class="ghost small" onclick="relEdit('${esc(n)}')">✎ ${hu?"Szerkesztés":"Edit"}</button></div><div id="relEd-${esc(n)}"></div>
+  const parts=T("partners")||[];
+  $("#partnerInfo").textContent = parts.length? (hu?`Csak velük van kapcsolata: ${parts.join(", ")}`:`Relationships only with: ${parts.join(", ")}`) : (hu?"Nyitott: bárkivel kapcsolatot épít, aki ír neki.":"Open: bonds with anyone who talks to it.");
+  $("#people").innerHTML = people.length? people.map(([n,r])=>`<div class="rel"><div class="row"><div class="name">${esc(n)}</div><div class="sp"></div><button class="ghost small" onclick="relEdit('${esc(n)}')">✎ ${hu?"Szerkesztés":"Edit"}</button>${(T("partners")||[]).length>1&&(T("partners")||[]).includes(n)?`<button class="ghost small" title="${hu?"Kapcsolat törlése":"Remove relationship"}" onclick="partnerRemove('${esc(n)}')">✕</button>`:""}</div><div id="relEd-${esc(n)}"></div>
     <div class="sub" style="margin-bottom:6px">${desc(r)} · ${r.interactions||0} ${t("interactions")} · ${t("last_seen")}: ${ago(s.t-r.last_seen)}${r.last_channel?` · ${t("last_channel")}: ${esc(r.last_channel)}`:""}${r.unanswered?` · <span style="color:var(--yel)">${t("unanswered")}: ${r.unanswered}</span>`:""}</div>
     <div class="kv"><b>${t("affection")}</b>${bar(r.affection,"var(--good)")}<span class="num">${pct(r.affection)}</span></div>
     <div class="kv"><b>${t("trust")}</b>${cbar(r.trust,"var(--blue)")}<span class="num">${pct(r.trust)}</span></div>
@@ -812,6 +814,12 @@ async function relSave(name){
 window.relEdit=relEdit; window.relSave=relSave;
 async function openSave(){ const v=+$("#openRange").value; await api(`/api/agents/${agent}/sexuality`,{method:"POST",body:JSON.stringify({openness:v})}); toast("✓ "+(HU()?"nyitottság":"openness")+" "+v.toFixed(2)); refresh(false); }
 window.openSave=openSave;
+async function partnerAdd(){ const hu=HU(), parts=T("partners")||[];
+  const n=(prompt(hu?"Kit adjak hozzá kapcsolatként? (név)":"Who should be added as a relationship? (name)")||"").trim(); if(!n) return;
+  if(!parts.length && !confirm(hu?`Ezután CSAK a listán szereplőkkel lesz kapcsolata (most: ${n}). Mehet?`:`From now on relationships ONLY with listed people (now: ${n}). OK?`)) return;
+  await api(`/api/agents/${agent}/partners`,{method:"POST",body:JSON.stringify({name:n})}); toast("＋ "+n); await loadTemp(); refresh(false); }
+async function partnerRemove(n){ const hu=HU(); if(!confirm(hu?`Törlöd ${n} kapcsolatát? A hozzá kötött érzések is elmennek.`:`Remove ${n}? Feelings aimed at them go too.`)) return;
+  await api(`/api/agents/${agent}/partners/${encodeURIComponent(n)}`,{method:"DELETE"}); toast("✕ "+n); await loadTemp(); refresh(false); }
 async function relSet(name, body){ await api(`/api/agents/${agent}/relationships/${encodeURIComponent(name)}`,{method:"PUT",body:JSON.stringify(body)}); toast("✓ "+name); refresh(false); }
 window.relSet=relSet;
 

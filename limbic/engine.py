@@ -125,6 +125,41 @@ NON_ENTITIES = {"image", "images", "picture", "photo", "file", "files", "kép", 
                 "user", "felhasználó", "nobody", "none", "null", "unknown", "self", "me", "én"}
 
 
+def canonical(T, name: str | None) -> str | None:
+    """Resolve an alias (another id/spelling of the same person)."""
+    if not name:
+        return name
+    n = str(name).strip()
+    return (getattr(T, "aliases", None) or {}).get(n, n)
+
+
+_REL_ADD = ("affection", "trust", "resentment", "fear", "strain", "longing", "intimacy", "attraction")
+
+
+def _add_rel_levels(dst: dict, src: dict) -> None:
+    """Fold one relationship into another (same person): levels add, clamped."""
+    for k in _REL_ADD:
+        lo = -1.0 if k == "trust" else 0.0
+        dst[k] = max(lo, min(1.0, float(dst.get(k, 0.0)) + float(src.get(k, 0.0))))
+    for k in ("interactions", "unanswered"):
+        dst[k] = int(dst.get(k, 0)) + int(src.get(k, 0))
+    for k in ("last_seen", "last_outreach", "steer_cooldown_until", "went_far_t"):
+        dst[k] = max(float(dst.get(k, 0.0)), float(src.get(k, 0.0)))
+    dst["first_seen"] = min(float(dst.get("first_seen", 1e18)), float(src.get("first_seen", 1e18)))
+    for k in ("went_far", "went_far_taboo", "heated_wrong"):
+        dst[k] = max(float(dst.get(k, 0.0)), float(src.get(k, 0.0)))
+    if float(src.get("last_channel_t", 0.0)) > float(dst.get("last_channel_t", 0.0)):
+        dst["last_channel"], dst["last_channel_t"] = src.get("last_channel", ""), src["last_channel_t"]
+    dst["is_person"] = bool(dst.get("is_person") or src.get("is_person"))
+    # consent and reachability are operator decisions about dst: never inherited
+
+
+def bond_allowed(T, name: str | None) -> bool:
+    """May the agent hold a relationship with this name? Empty partner list = open."""
+    parts = getattr(T, "partners", None) or []
+    return bool(name) and (not parts or name in parts)
+
+
 def _is_entity(name: str, rels: dict) -> bool:
     """A feeling can be aimed at someone (or a named thing), not at a generic noun."""
     n = str(name).strip()
@@ -337,6 +372,13 @@ class Engine:
         self.advance(s, now)
         T = self.t
         rel = None
+        speaker = canonical(T, speaker)
+        if speaker and not bond_allowed(T, speaker):
+            speaker = None   # heard, but no relationship with them
+        if ap.target:
+            ap.target = canonical(T, ap.target)
+            if T.partners and ap.target not in T.partners:
+                ap.target = None   # feelings are only ever aimed at partners
         if speaker:  # whoever talks to the agent is a person
             sp = s.relationships.setdefault(speaker, _new_relationship(now))
             needs.normalize_relationship(sp, now)
