@@ -695,9 +695,12 @@ class Engine:
 
 
 def _leisure_view(s: State) -> dict[str, Any]:
-    from . import leisure
+    from . import leisure, tastes
     lz = leisure.ensure(s)
+    # tastes: what she has figured out (interests / dislikes / boundaries). Runners use this
+    # to skip boundary topics; without it the boundary filter would run blind.
     return {"current": lz["current"], "resting": lz["resting"], "taste": lz["taste"],
+            "tastes": tastes.summary(s, s.t),
             "log": lz["log"][-10:][::-1]}
 
 

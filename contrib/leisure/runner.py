@@ -47,6 +47,12 @@ import urllib.parse
 import urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
+import types
+
+# repo root -> limbic package (tastes/rules live there, not in this runner)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from limbic import rules as _rules  # noqa: E402
+from limbic import tastes as _tastes  # noqa: E402
 
 log = logging.getLogger("leisure")
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
@@ -378,13 +384,29 @@ class Session:
         topic, query = bm.get("topic") or cur.get("topic"), bm.get("query")
         if not topic:
             notes = "; ".join(f"{n['topic']}: {n['note'][:80]}" for n in self.j.recent_notes(8)) or "még semmi"
+            # what she already dislikes / refuses: from the tastes layer
+            # the server already computed the summary in /leisure ("tastes"); use it as-is
+            ts = (self.lim.leisure() or {}).get("tastes") or {}
+            tabu = [t["topic"] for t in ts.get("boundaries", [])]
+            dislikes = [t["topic"] for t in ts.get("dislikes", [])]
             pick = self.llm.json(
                 self.who + "\n" + SAFETY,
                 f"Unatkozol, és netezni támadt kedved. Korábban ezeket olvastad: {notes}\n"
+                f"Nem szereted: {', '.join(dislikes) or 'semmi konkrét'}. "
+                f"Határ, ezt nem nézed: {', '.join(tabu) or 'semmi'}.\n"
                 "Mi érdekelne most? Lehet folytatás vagy valami egészen új. "
                 'JSON: {"topic": "1-4 szavas téma", "query": "keresőkifejezés", "why": "egy mondat"}')
             topic, query = str(pick.get("topic", ""))[:60] or "érdekességek", str(pick.get("query", ""))[:120]
+            if any(_tastes.norm(topic) == _tastes.norm(t) for t in tabu):
+                self.say(f"téma elvetve (határ): {topic}")
+                # the refusal goes into the notes too, so the next pick sees it
+                # (no content of the topic is stored, only the fact of the refusal)
+                self.j._append(self.j.notes, {"t": time.time(), "topic": topic,
+                                              "note": "nem néztem meg: határ (kifejezett kérés)",
+                                              "url": "", "title": "", "tag": "elvetve"})
+                return {"reason": "boundary", "topic": topic}
             self.say(f"téma: {topic} ({pick.get('why', '')})")
+        _rules.check_leisure_action("search")
         steps = 0
         reason = "done"
         while steps < self.c.max_steps:

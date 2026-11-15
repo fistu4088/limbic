@@ -1,0 +1,11 @@
+{
+  "_comment": "Példa prior fájl SZINTETIKUS teszt-agenthez. Nem Viki adatai. Éles agent priorjai data/priors/<agent>.json alatt, git-en kívül.",
+  "agent": "teszt",
+  "tastes": [
+    {"topic": "sci-fi", "w": 0.5},
+    {"topic": "horror", "w": 0.4},
+    {"topic": "informatika", "w": 0.4},
+    {"topic": "nagy hangos reklám", "w": -0.5},
+    {"topic": "tényleges spoiler", "kind": "boundary"}
+  ]
+}

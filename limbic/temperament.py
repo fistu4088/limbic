@@ -136,7 +136,7 @@ class Temperament:
     # ---- leisure (free time; see leisure.py) ---------------------------
     leisure_enabled: bool = True
     leisure_activities: list[str] = field(default_factory=lambda: ["web", "lector", "journal"])
-    leisure_prior: dict[str, float] = field(default_factory=lambda: {"web": 0.15, "lector": 0.2, "journal": 0.1, "code": 0.05})
+    leisure_prior: dict[str, float] = field(default_factory=lambda: {"web": 0.15, "lector": 0.2, "journal": 0.1})
     leisure_urge_min: float = 0.12    # below this she isn't bored enough to bother
     leisure_eagerness: float = 0.12   # start chance per evaluation at full urge and neutral mood
     leisure_nothing_weight: float = 0.35

@@ -29,7 +29,6 @@ ACTIVITIES: dict[str, dict[str, Any]] = {
     "web":     {"fatigue": 0.006, "novelty": 0.10, "max_min": 35, "demand": 0.6, "hu": "netes olvasgatás", "en": "reading on the web"},
     "lector":  {"fatigue": 0.002, "novelty": 0.06, "max_min": 60, "demand": 0.35, "hu": "olvasás (manga/könyv)", "en": "reading a story"},
     "journal": {"fatigue": 0.006, "novelty": 0.03, "max_min": 20, "demand": 0.45, "hu": "naplóírás", "en": "writing in the journal"},
-    "code":    {"fatigue": 0.030, "novelty": 0.12, "max_min": 40, "demand": 1.0, "hu": "kísérletezés scriptekkel", "en": "tinkering with scripts"},
 }
 
 
@@ -148,8 +147,6 @@ def appeal(engine, s, act: str, now: float) -> float:
     if cur and cur["activity"] == act and cur["status"] == "paused":
         a += T.leisure_resume_bonus * (0.5 + 0.5 * max(0.0, cur.get("enjoy_so_far", 0.0) + 0.5))
     # activity / mood fit
-    if act == "code":
-        a *= 0.6 + 0.6 * max(0.0, s.mood["p"] + 0.3)     # needs a decent mood
     # energy: tiredness makes demanding things unappealing, loved ones much less so
     a *= max(0.0, 1.0 - 1.4 * effort_cost(engine, s, act))
     if act == "journal":
@@ -399,6 +396,11 @@ def _close(engine, s, cur: dict, now: float, rating: float | None = None, summar
              "topic": cur.get("topic") or bm.get("topic") or bm.get("slug"), "summary": (summary or "")[:400],
              "reason": "abandoned" if abandoned else (reason or "done"),
              "bookmark": cur.get("bookmark")}
+    # taste: what she liked or disliked is learned from the topic it was about
+    if entry["topic"] and not abandoned and cur["steps"] > 0:
+        from . import tastes as _tastes
+        _tastes.record(s, entry["topic"], enjoy, 0.3 + 0.7 * min(1.0, abs(enjoy)), now,
+                       tags=cur.get("tags"))
     lz["log"] = (lz["log"] + [entry])[-40:]
     lz["current"] = None
     lz["last_end"] = now
