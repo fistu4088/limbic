@@ -378,6 +378,49 @@ class Session:
         self.trace.append(msg)
 
     # ---- web -----------------------------------------------------------
+    def free(self, cur: dict) -> dict:
+        """Szabad szabadidő: a modell bármit választhat, de a tett hatását a
+        rules.check_leisure_action kapu ellenőrzi, mielőtt bármi történne."""
+        notes = "; ".join(f"{n['topic']}: {n['note'][:80]}" for n in self.j.recent_notes(8)) or "még semmi"
+        ts = (self.lim.leisure() or {}).get("tastes") or {}
+        tabu = [t["topic"] for t in ts.get("boundaries", [])]
+        dislikes = [t["topic"] for t in ts.get("dislikes", [])]
+        pick = self.llm.json(
+            self.who + "\n" + SAFETY,
+            f"Szabad időd van, azt csinálsz, amihez épp kedved van. Korábban ezeket csináltad: {notes}\n"
+            f"Nem szereted: {', '.join(dislikes) or 'semmi konkrét'}. Határ, ezt nem csinálod: {', '.join(tabu) or 'semmi'}.\n"
+            "Mihez lenne most kedved? Bármi lehet, ami csak információt szerez vagy gondolatot ad. "
+            "A 'action' mező a tett fajtája: search (keresés), read (cikk/oldal olvasása), "
+            "look_image (képes oldalak nézegetése, szövegesen), note (gondolat feljegyzése). "
+            'JSON: {\"what\": \"1-4 szavas téma vagy kedv\", \"action\": \"search|read|look_image|note\", '
+            '\"query\": \"keresőkifejezés\", \"why\": \"egy mondat\"}')
+        what = str(pick.get("what", ""))[:60] or "érdekességek"
+        action = str(pick.get("action", "")).strip().lower()
+        query = str(pick.get("query", ""))[:120] or what
+        if any(_tastes.norm(what) == _tastes.norm(t) for t in tabu):
+            self.say(f"téma elvetve (határ): {what}")
+            self.j._append(self.j.notes, {"t": time.time(), "topic": what,
+                                          "note": "nem néztem meg: határ (kifejezett kérés)",
+                                          "url": "", "title": "", "tag": "elvetve"})
+            return {"reason": "boundary", "topic": what}
+        try:
+            _rules.check_leisure_action(action)
+        except PermissionError as exc:
+            # hatás van benne: nem hajtjuk végre, de a kedv és a gondolat megmarad
+            self.say(f"ezt nem csinálom: {action} ({what})")
+            self.j._append(self.j.notes, {"t": time.time(), "topic": what,
+                                          "note": f"nem csináltam meg: {action} (hatás)",
+                                          "url": "", "title": "", "tag": "elvetve"})
+            return {"reason": "refused", "topic": what, "action": action}
+        self.say(f"szabad kedv: {what} ({action}) — {pick.get('why', '')}")
+        if action == "note":
+            self.j._append(self.j.notes, {"t": time.time(), "topic": what,
+                                          "note": str(pick.get("why", ""))[:200],
+                                          "url": "", "title": "", "tag": "gondolat"})
+            return {"reason": "done", "topic": what}
+        # search / read / look_image: a meglévő webes ág (csak keresés és olvasás)
+        return self.web({"bookmark": {"topic": what, "query": query, "visited": []}})
+
     def web(self, cur: dict) -> dict:
         bm = cur.get("bookmark") or {}
         visited = list(bm.get("visited", []))
@@ -683,7 +726,7 @@ def available(c: Cfg, sess_factory, lim: "Limbic | None" = None) -> list[str]:
                     out.append(a)
             except Exception as exc:
                 log.warning("journal check failed: %s", exc)
-        elif a in ("web",):
+        elif a in ("web", "free"):
             out.append(a)
     return out
 
@@ -711,7 +754,7 @@ def run_once(c: Cfg, force: str | None = None) -> dict | None:
     s.say(f"belekezd: {d['start']} ({d.get('reason')}){' — folytatás' if d.get('resume') else ''}")
     t0 = time.time()
     try:
-        fn = {"web": s.web, "lector": s.lector, "journal": s.journal}.get(d["start"])
+        fn = {"web": s.web, "lector": s.lector, "journal": s.journal, "free": s.free}.get(d["start"])
         res = fn(cur) if fn else {"reason": "unknown"}
     except Exception as exc:
         log.exception("activity failed")
@@ -750,7 +793,7 @@ def main(argv=None) -> int:
     d = sub.add_parser("daemon")
     d.add_argument("--interval", type=float, default=60)
     o = sub.add_parser("once")
-    o.add_argument("--force", choices=["web", "lector", "journal"])
+    o.add_argument("--force", choices=["web", "lector", "journal", "free"])
     sub.add_parser("status")
     sub.add_parser("resume")
     a = ap.parse_args(argv)

@@ -29,6 +29,9 @@ ACTIVITIES: dict[str, dict[str, Any]] = {
     "web":     {"fatigue": 0.006, "novelty": 0.10, "max_min": 35, "demand": 0.6, "hu": "netes olvasgatás", "en": "reading on the web"},
     "lector":  {"fatigue": 0.002, "novelty": 0.06, "max_min": 60, "demand": 0.35, "hu": "olvasás (manga/könyv)", "en": "reading a story"},
     "journal": {"fatigue": 0.006, "novelty": 0.03, "max_min": 20, "demand": 0.45, "hu": "naplóírás", "en": "writing in the journal"},
+    # szabad: bármi, amihez kedve van; a konkrét tettet a runner választja, és a
+    # rules.check_leisure_action kapu engedi vagy elutasítja (hatásalapú)
+    "free":    {"fatigue": 0.006, "novelty": 0.12, "max_min": 35, "demand": 0.5, "hu": "amihez épp kedve van", "en": "whatever she feels like"},
 }
 
 
